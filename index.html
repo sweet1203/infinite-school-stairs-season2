@@ -279,6 +279,58 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .gameover {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(3, 6, 14, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+    .gameover.show { display: flex; }
+    .go-card {
+      width: min(540px, calc(100vw - 32px));
+      border: 1px solid #364a7d;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #16274d 0%, #101a33 100%);
+      padding: 20px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+    }
+    .go-title {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .go-desc {
+      color: var(--sub);
+      margin-bottom: 14px;
+    }
+    .go-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .go-item {
+      border: 1px solid #2f3f6b;
+      border-radius: 10px;
+      background: rgba(9, 15, 30, 0.6);
+      padding: 10px 12px;
+    }
+    .go-item .k { color: var(--sub); font-size: 12px; }
+    .go-item .v { font-size: 21px; font-weight: 800; margin-top: 2px; }
+    .go-actions { display: flex; gap: 10px; }
+    .go-actions button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 14px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .go-actions .primary { background: #4d6ed0; color: #fff; }
+    .go-actions .secondary { background: #29385f; color: #dce6ff; }
   </style>
 </head>
 <body>
@@ -380,6 +432,23 @@
     </aside>
   </main>
 
+  <section id="gameoverModal" class="gameover">
+    <div class="go-card">
+      <div id="goTitle" class="go-title">TIME OVER</div>
+      <div id="goDesc" class="go-desc">다시 도전해서 계단을 더 올라가 보세요!</div>
+      <div class="go-grid">
+        <div class="go-item"><div class="k">최종 점수</div><div id="goScore" class="v">0</div></div>
+        <div class="go-item"><div class="k">최대 콤보</div><div id="goCombo" class="v">0</div></div>
+        <div class="go-item"><div class="k">정확도</div><div id="goAcc" class="v">0%</div></div>
+        <div class="go-item"><div class="k">오른 계단</div><div id="goStair" class="v">0</div></div>
+      </div>
+      <div class="go-actions">
+        <button id="goReplay" class="primary" type="button">다시 플레이</button>
+        <button id="goClose" class="secondary" type="button">닫기</button>
+      </div>
+    </div>
+  </section>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
     import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
@@ -474,6 +543,8 @@
       tries: 0,
       startedAt: 0,
       currentWord: "",
+      inputProgress: 0,
+      maxCombo: 0,
       timerId: null,
       timeLeftSec: 300
     };
@@ -501,9 +572,18 @@
       ,
       playerName: document.getElementById("playerName"),
       saveRankBtn: document.getElementById("saveRankBtn"),
-      rankList: document.getElementById("rankList")
-      ,
+      rankList: document.getElementById("rankList"),
       stairCanvas: document.getElementById("stairCanvas")
+      ,
+      gameoverModal: document.getElementById("gameoverModal"),
+      goTitle: document.getElementById("goTitle"),
+      goDesc: document.getElementById("goDesc"),
+      goScore: document.getElementById("goScore"),
+      goCombo: document.getElementById("goCombo"),
+      goAcc: document.getElementById("goAcc"),
+      goStair: document.getElementById("goStair"),
+      goReplay: document.getElementById("goReplay"),
+      goClose: document.getElementById("goClose")
     };
 
     const scene = {
@@ -512,6 +592,45 @@
       mood: "idle", // idle | good | bad
       moodUntil: 0
     };
+
+    let _ac = null;
+    function getAC() {
+      if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (_ac.state === "suspended") _ac.resume();
+      return _ac;
+    }
+    function tone(freq, dur = 0.05, type = "sine", vol = 0.15, when = 0) {
+      if (!freq) return;
+      const ac = getAC();
+      const t = ac.currentTime + when;
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      o.connect(g);
+      g.connect(ac.destination);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t);
+      o.stop(t + dur + 0.02);
+    }
+    function sfxType(charCode) {
+      const f = 420 + (charCode % 12) * 22;
+      tone(f, 0.03, "triangle", 0.05);
+    }
+    function sfxGood() {
+      [660, 880].forEach((f, i) => tone(f, 0.07, "triangle", 0.12, i * 0.03));
+    }
+    function sfxNear() {
+      [520, 620].forEach((f, i) => tone(f, 0.06, "sine", 0.08, i * 0.03));
+    }
+    function sfxBad() {
+      tone(190, 0.08, "square", 0.1);
+      tone(140, 0.1, "sawtooth", 0.08, 0.05);
+    }
+    function sfxGameOver() {
+      [523, 440, 349, 262].forEach((f, i) => tone(f, 0.2, "triangle", 0.12, i * 0.08));
+    }
 
     function checkDesktopOnly() {
       const ok = window.innerWidth >= 1024;
@@ -621,7 +740,8 @@
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
-      scene.visualProgress += (scene.progress - scene.visualProgress) * 0.2;
+      const targetProgress = scene.progress + state.inputProgress;
+      scene.visualProgress += (targetProgress - scene.visualProgress) * 0.2;
       const cam = scene.visualProgress;
 
       // stairs (endless feeling)
@@ -644,19 +764,7 @@
       const localStep = cam - Math.floor(cam);
       const baseX = 196;
       const baseY = h - 74 + localStep * 15;
-      const hop = Math.sin(now * 0.016) * 2;
-      ctx.save();
-      ctx.translate(baseX, baseY - 12 + hop);
-      ctx.fillStyle = "#ffde59";
-      ctx.beginPath();
-      ctx.arc(0, -18, 12, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = scene.mood === "bad" ? "#ff6b6b" : "#8ad4ff";
-      ctx.fillRect(-9, -8, 18, 22);
-      ctx.fillStyle = "#1f2438";
-      ctx.fillRect(-10, 12, 7, 10);
-      ctx.fillRect(3, 12, 7, 10);
-      ctx.restore();
+      drawCuteCharacter(ctx, baseX, baseY, now);
 
       if (scene.mood === "good") {
         ctx.fillStyle = "#44d492";
@@ -672,6 +780,127 @@
       ctx.font = "bold 14px sans-serif";
       ctx.fillText(`Stair: ${Math.max(0, Math.floor(scene.progress))}`, 14, 22);
       requestAnimationFrame(drawScene);
+    }
+
+    function drawCuteCharacter(ctx, x, y, now) {
+      const hop = Math.sin(now * 0.016) * 2;
+      const swing = Math.sin(now * 0.012) * 0.25;
+      const isBad = scene.mood === "bad";
+      const isGood = scene.mood === "good";
+
+      ctx.save();
+      ctx.translate(x, y - 12 + hop);
+
+      // shadow
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.beginPath();
+      ctx.ellipse(0, 20, 17, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // body (hoodie)
+      ctx.fillStyle = isBad ? "#ff9ba7" : "#92c7ff";
+      ctx.beginPath();
+      ctx.roundRect(-13, -4, 26, 26, 9);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.beginPath();
+      ctx.roundRect(-6, -2, 12, 18, 6);
+      ctx.fill();
+
+      // arms
+      ctx.strokeStyle = isBad ? "#ff8b98" : "#7cb6f6";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-10, 2);
+      ctx.lineTo(-18 + swing * 4, 10);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(10, 2);
+      ctx.lineTo(18 - swing * 4, 10);
+      ctx.stroke();
+
+      // legs + shoes
+      const legSwing = Math.sin(now * 0.02) * 2;
+      ctx.fillStyle = "#2b3557";
+      ctx.beginPath();
+      ctx.roundRect(-10, 19, 8, 13 + legSwing, 4);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(2, 19, 8, 13 - legSwing, 4);
+      ctx.fill();
+      ctx.fillStyle = "#101722";
+      ctx.beginPath();
+      ctx.roundRect(-12, 31, 12, 6, 3);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(0, 31, 12, 6, 3);
+      ctx.fill();
+
+      // head
+      ctx.fillStyle = "#ffd66e";
+      ctx.beginPath();
+      ctx.arc(0, -18, 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      // hair
+      ctx.fillStyle = "#2b2340";
+      ctx.beginPath();
+      ctx.arc(0, -22, 14, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(-12, -24, 24, 8, 4);
+      ctx.fill();
+
+      // ribbon
+      ctx.fillStyle = "#ff5fa8";
+      ctx.beginPath();
+      ctx.ellipse(-12, -24, 4, 3, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(-5, -25, 3.5, 2.7, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // eyes
+      ctx.fillStyle = "#1a1d2b";
+      if (isBad) {
+        ctx.strokeStyle = "#1a1d2b";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-6, -19); ctx.lineTo(-2, -15);
+        ctx.moveTo(-2, -19); ctx.lineTo(-6, -15);
+        ctx.moveTo(6, -19); ctx.lineTo(2, -15);
+        ctx.moveTo(2, -19); ctx.lineTo(6, -15);
+        ctx.stroke();
+      } else {
+        ctx.beginPath(); ctx.arc(-4.5, -17, 1.8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(4.5, -17, 1.8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(-5.2, -17.5, 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(3.8, -17.5, 0.6, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // blush
+      ctx.fillStyle = "rgba(255,120,130,0.45)";
+      ctx.beginPath(); ctx.ellipse(-8.3, -13, 2.6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(8.3, -13, 2.6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+
+      // mouth
+      ctx.strokeStyle = "#8c3f44";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      if (isBad) {
+        ctx.arc(0, -11, 3.5, Math.PI * 1.05, Math.PI * 1.95);
+      } else if (isGood) {
+        ctx.arc(0, -12, 4, 0.1, Math.PI - 0.1);
+      } else {
+        ctx.moveTo(-2, -11);
+        ctx.lineTo(2, -11);
+      }
+      ctx.stroke();
+
+      ctx.restore();
     }
 
     function tickA() {
@@ -690,14 +919,18 @@
       state.running = true;
       state.score = 0;
       state.combo = 0;
+      state.maxCombo = 0;
       state.mistakes = 0;
       state.correctChars = 0;
       state.tries = 0;
       state.startedAt = Date.now();
       state.timeLeftSec = 300;
+      state.inputProgress = 0;
       scene.progress = 0;
       scene.visualProgress = 0;
       sceneReact("idle");
+      getAC();
+      el.gameoverModal.classList.remove("show");
 
       el.startBtn.disabled = true;
       el.restartBtn.disabled = false;
@@ -723,6 +956,7 @@
     function endGame(reason) {
       state.running = false;
       clearTimeout(state.timerId);
+      state.inputProgress = 0;
       el.wordInput.disabled = true;
       el.startBtn.disabled = false;
       el.restartBtn.disabled = false;
@@ -734,6 +968,8 @@
       renderBest();
       setFeedback(`게임 종료 - ${reason} (최종 점수 ${state.score})`, "warn");
       el.playerName.focus();
+      sfxGameOver();
+      openGameOver(reason);
     }
 
     function submitWord() {
@@ -747,9 +983,11 @@
       const allowTypo = state.drillType === "word" && target.length >= 5;
       const perfect = typed === target;
       const near = allowTypo && dist === 1;
+      state.inputProgress = 0;
 
       if (perfect || near) {
         state.combo += 1;
+        state.maxCombo = Math.max(state.maxCombo, state.combo);
         const base = state.currentWord.length;
         const earned = near ? Math.max(1, Math.floor(base * 0.6)) : base;
         state.score += earned;
@@ -757,12 +995,15 @@
         setFeedback(near ? `근접 정답(오타 1자 허용)! +${earned}점` : `정답! +${earned}점`, "good");
         scene.progress += near ? 0.75 : 1;
         sceneReact("good");
+        if (near) sfxNear();
+        else sfxGood();
       } else {
         state.combo = 0;
         state.mistakes += 1;
         setFeedback(`오답: ${typed} (정답: ${state.currentWord})`, "bad");
         scene.progress = Math.max(0, scene.progress - 0.25);
         sceneReact("bad");
+        sfxBad();
         if (state.mode === "B" && state.mistakes >= 5) {
           updateStats();
           endGame("B 단계 오답 5회");
@@ -774,6 +1015,32 @@
       el.wordInput.value = "";
       setNextWord();
       updateStats();
+    }
+
+    function updateTypingProgress(raw) {
+      if (!state.running) return;
+      const typed = raw.trim().toLowerCase();
+      const target = state.currentWord.toLowerCase();
+      if (!typed || !target) {
+        state.inputProgress = 0;
+        return;
+      }
+      let samePrefix = 0;
+      const max = Math.min(typed.length, target.length);
+      while (samePrefix < max && typed[samePrefix] === target[samePrefix]) samePrefix++;
+      const ratio = samePrefix / Math.max(target.length, 1);
+      state.inputProgress = Math.max(0, Math.min(0.92, ratio));
+    }
+
+    function openGameOver(reason) {
+      const acc = state.tries ? Math.round(((state.tries - state.mistakes) / state.tries) * 100) : 0;
+      el.goTitle.textContent = state.mode === "A" ? "⏱ TIME OVER!" : "💥 GAME OVER!";
+      el.goDesc.textContent = `${reason} · 저장 버튼으로 랭킹에 올려보세요!`;
+      el.goScore.textContent = String(state.score);
+      el.goCombo.textContent = String(state.maxCombo);
+      el.goAcc.textContent = `${Math.max(0, acc)}%`;
+      el.goStair.textContent = String(Math.floor(scene.progress));
+      el.gameoverModal.classList.add("show");
     }
 
     function renderBest() {
@@ -895,6 +1162,17 @@
     el.saveRankBtn.addEventListener("click", saveRanking);
     el.wordInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submitWord();
+      else if (e.key.length === 1) sfxType(e.key.charCodeAt(0));
+    });
+    el.wordInput.addEventListener("input", (e) => {
+      updateTypingProgress(e.target.value);
+    });
+    el.goReplay.addEventListener("click", () => {
+      el.gameoverModal.classList.remove("show");
+      restartGame();
+    });
+    el.goClose.addEventListener("click", () => {
+      el.gameoverModal.classList.remove("show");
     });
     window.addEventListener("resize", checkDesktopOnly);
 
