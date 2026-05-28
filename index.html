@@ -131,6 +131,18 @@
       border-radius: 14px;
       background: rgba(7, 12, 23, 0.55);
     }
+    .stair-scene {
+      margin: 8px 0 16px;
+      border: 1px solid #33436c;
+      border-radius: 12px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #1a2850 0%, #101a36 100%);
+    }
+    #stairCanvas {
+      width: 100%;
+      height: 180px;
+      display: block;
+    }
 
     .status-line {
       display: flex;
@@ -322,6 +334,9 @@
           <div id="modeLabel">현재 모드: A 단계</div>
           <div id="timerLabel">남은 시간: 05:00</div>
         </div>
+        <div class="stair-scene">
+          <canvas id="stairCanvas" width="900" height="180"></canvas>
+        </div>
 
         <div id="targetWord">start</div>
         <input id="wordInput" type="text" placeholder="여기에 영어 단어를 입력하고 Enter" autocomplete="off" spellcheck="false" disabled>
@@ -364,6 +379,36 @@
       </div>
     </aside>
   </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+    import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDyEJ4an-6rmd2qYPy7EC0AniZZQ9n3NSQ",
+      authDomain: "school-stair.firebaseapp.com",
+      databaseURL: "https://school-stair-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "school-stair",
+      storageBucket: "school-stair.firebasestorage.app",
+      messagingSenderId: "338283323450",
+      appId: "1:338283323450:web:8d56908fe5dcdcf5b3d503",
+      measurementId: "G-T4YZT0Q3PB"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    let analytics = null;
+    isSupported()
+      .then((ok) => {
+        if (ok) analytics = getAnalytics(app);
+      })
+      .catch(() => {});
+
+    // 기존 REST 기반 랭킹 로직에서 참고할 수 있도록 노출
+    window.__FIREBASE_CONFIG__ = firebaseConfig;
+    window.__FIREBASE_APP__ = app;
+    window.__FIREBASE_ANALYTICS__ = analytics;
+    console.log("[S2] Firebase initialized");
+  </script>
 
   <script>
     const DB_URL = "https://school-stair-default-rtdb.asia-southeast1.firebasedatabase.app";
@@ -457,6 +502,15 @@
       playerName: document.getElementById("playerName"),
       saveRankBtn: document.getElementById("saveRankBtn"),
       rankList: document.getElementById("rankList")
+      ,
+      stairCanvas: document.getElementById("stairCanvas")
+    };
+
+    const scene = {
+      progress: 0,
+      visualProgress: 0,
+      mood: "idle", // idle | good | bad
+      moodUntil: 0
     };
 
     function checkDesktopOnly() {
@@ -547,6 +601,79 @@
       el.feedback.className = kind ? kind : "";
     }
 
+    function sceneReact(mood) {
+      scene.mood = mood;
+      scene.moodUntil = Date.now() + 420;
+    }
+
+    function drawScene() {
+      const c = el.stairCanvas;
+      const ctx = c.getContext("2d");
+      const w = c.width;
+      const h = c.height;
+      const now = Date.now();
+      if (scene.moodUntil < now) scene.mood = "idle";
+
+      ctx.clearRect(0, 0, w, h);
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, "#23386f");
+      g.addColorStop(1, "#101a36");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      scene.visualProgress += (scene.progress - scene.visualProgress) * 0.2;
+      const cam = scene.visualProgress;
+
+      // stairs (endless feeling)
+      const stairW = 118;
+      const stairH = 14;
+      const center = Math.floor(cam);
+      for (let i = center - 3; i < center + 14; i++) {
+        const rel = i - cam;
+        const x = 120 + rel * 76;
+        const y = h - 28 - rel * 15;
+        if (x < -150 || x > w + 40 || y < -40 || y > h + 20) continue;
+        const climbed = i <= cam;
+        ctx.fillStyle = climbed ? "#9fb5ff" : "rgba(255,255,255,0.22)";
+        ctx.fillRect(x, y, stairW, stairH);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fillRect(x + 5, y + 2, stairW - 10, 2);
+      }
+
+      // character (camera follows stairs)
+      const localStep = cam - Math.floor(cam);
+      const baseX = 196;
+      const baseY = h - 74 + localStep * 15;
+      const hop = Math.sin(now * 0.016) * 2;
+      ctx.save();
+      ctx.translate(baseX, baseY - 12 + hop);
+      ctx.fillStyle = "#ffde59";
+      ctx.beginPath();
+      ctx.arc(0, -18, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = scene.mood === "bad" ? "#ff6b6b" : "#8ad4ff";
+      ctx.fillRect(-9, -8, 18, 22);
+      ctx.fillStyle = "#1f2438";
+      ctx.fillRect(-10, 12, 7, 10);
+      ctx.fillRect(3, 12, 7, 10);
+      ctx.restore();
+
+      if (scene.mood === "good") {
+        ctx.fillStyle = "#44d492";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText("Great! +Step", Math.min(baseX + 24, w - 120), Math.max(24, baseY - 30));
+      } else if (scene.mood === "bad") {
+        ctx.fillStyle = "#ff6b6b";
+        ctx.font = "bold 16px sans-serif";
+        ctx.fillText("Oops!", Math.min(baseX + 24, w - 80), Math.max(24, baseY - 30));
+      }
+
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(`Stair: ${Math.max(0, Math.floor(scene.progress))}`, 14, 22);
+      requestAnimationFrame(drawScene);
+    }
+
     function tickA() {
       if (!state.running || state.mode !== "A") return;
       state.timeLeftSec -= 1;
@@ -568,6 +695,9 @@
       state.tries = 0;
       state.startedAt = Date.now();
       state.timeLeftSec = 300;
+      scene.progress = 0;
+      scene.visualProgress = 0;
+      sceneReact("idle");
 
       el.startBtn.disabled = true;
       el.restartBtn.disabled = false;
@@ -625,10 +755,14 @@
         state.score += earned;
         state.correctChars += near ? Math.floor(base * 0.8) : base;
         setFeedback(near ? `근접 정답(오타 1자 허용)! +${earned}점` : `정답! +${earned}점`, "good");
+        scene.progress += near ? 0.75 : 1;
+        sceneReact("good");
       } else {
         state.combo = 0;
         state.mistakes += 1;
         setFeedback(`오답: ${typed} (정답: ${state.currentWord})`, "bad");
+        scene.progress = Math.max(0, scene.progress - 0.25);
+        sceneReact("bad");
         if (state.mode === "B" && state.mistakes >= 5) {
           updateStats();
           endGame("B 단계 오답 5회");
@@ -765,6 +899,7 @@
     window.addEventListener("resize", checkDesktopOnly);
 
     checkDesktopOnly();
+    drawScene();
     setNextWord();
     renderBest();
     loadRankings();
