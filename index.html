@@ -231,6 +231,7 @@
       score: 0,
       stair: 0,
       target: "",
+      progressIdx: 0,
       timer: null,
       timeLeft: LIMIT_SEC,
       mood: "idle",
@@ -290,7 +291,12 @@
     function pick(){ return state.mode==="word" ? WORDS[Math.floor(Math.random()*WORDS.length)] : SENTENCES[Math.floor(Math.random()*SENTENCES.length)]; }
     function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
     function updateHUD(){ el.scoreLabel.textContent=`점수 ${state.score}`; el.stairLabel.textContent=`계단 ${state.stair}칸`; el.timeLabel.textContent=`시간 ${fmt(state.timeLeft)}`; }
-    function nextTarget(){ state.target = pick(); el.targetWord.textContent = state.target; }
+    function nextTarget(){
+      state.target = pick();
+      state.progressIdx = 0;
+      el.targetWord.textContent = state.target;
+      el.wordInput.value = "";
+    }
     function react(m){ state.mood=m; state.moodUntil=Date.now()+420; }
     function feedback(msg, kind){ el.feedback.textContent=msg; el.feedback.className=`feedback ${kind||""}`; }
 
@@ -308,7 +314,6 @@
       show("game");
       updateHUD();
       nextTarget();
-      el.wordInput.value = "";
       el.wordInput.focus();
       getAC();
       tick();
@@ -322,23 +327,51 @@
       state.timer = setTimeout(tick, 1000);
     }
 
-    function submit(){
+    function handleTypingKey(e){
       if(!state.running) return;
-      const typed = el.wordInput.value.trim().toLowerCase();
-      if(!typed) return;
-      const ok = typed === state.target.toLowerCase();
-      if(ok){
-        state.stair += 1;
-        state.score += state.target.length;
-        react("good"); sfx.good(); feedback(`정답! +${state.target.length}점`, "good");
-        scene.stepAnimUntil = Date.now() + 320;
-      }else{
-        state.stair = Math.max(0, state.stair - 1);
-        react("bad"); sfx.bad(); feedback(`오답: ${typed}`, "bad");
+      const key = e.key;
+      if (key === "Enter" || key === "Tab") {
+        e.preventDefault();
+        return;
       }
-      el.wordInput.value = "";
-      updateHUD();
-      nextTarget();
+      if (key === "Backspace") {
+        e.preventDefault();
+        if (state.progressIdx > 0) {
+          state.progressIdx -= 1;
+          el.wordInput.value = state.target.slice(0, state.progressIdx);
+          feedback("이전 글자로 돌아갔어요.", "");
+        }
+        return;
+      }
+      if (key.length !== 1) return;
+      e.preventDefault();
+      const expected = state.target[state.progressIdx];
+      if (!expected) return;
+
+      if (key.toLowerCase() === expected.toLowerCase()) {
+        state.progressIdx += 1;
+        state.stair += 1;   // 한 글자 맞출 때마다 +1칸
+        state.score += 1;   // 점수도 글자 단위
+        scene.stepAnimUntil = Date.now() + 220;
+        react("good");
+        sfx.type(key.charCodeAt(0));
+        el.wordInput.value = state.target.slice(0, state.progressIdx);
+        updateHUD();
+
+        if (state.progressIdx >= state.target.length) {
+          sfx.good();
+          feedback("단어 완료! 다음 문제로 넘어갑니다.", "good");
+          setTimeout(() => {
+            if (!state.running) return;
+            nextTarget();
+            feedback("", "");
+          }, 180);
+        }
+      } else {
+        react("bad");
+        sfx.bad();
+        feedback(`오타! 현재 글자 '${expected}'를 입력하세요.`, "bad");
+      }
     }
 
     function gameOver(reason){
@@ -467,7 +500,7 @@
     el.btnRankBack.addEventListener("click", ()=>show("main"));
     el.btnBackMain.addEventListener("click", ()=>{ state.running=false; clearTimeout(state.timer); show("main"); });
     el.btnRestart.addEventListener("click", ()=>start(state.mode));
-    el.wordInput.addEventListener("keydown",(e)=>{ if(e.key==="Enter") submit(); else if(e.key.length===1) sfx.type(e.key.charCodeAt(0)); });
+    el.wordInput.addEventListener("keydown", handleTypingKey);
     el.btnSaveRank.addEventListener("click", saveRank);
     el.btnGoReplay.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); start(state.mode); });
     el.btnGoClose.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); show("main"); });
