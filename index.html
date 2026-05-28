@@ -214,6 +214,9 @@
       mood: "idle",
       moodUntil: 0
     };
+    const scene = {
+      cam: 0
+    };
     const dogImage = new Image();
     dogImage.src = "dog.png"; // 사용자가 만든 강아지 캐릭터 파일
 
@@ -249,6 +252,7 @@
       state.stair = 0;
       state.timeLeft = LIMIT_SEC;
       state.mood = "idle";
+      scene.cam = 0;
       clearTimeout(state.timer);
       el.modeLabel.textContent = mode==="word" ? "단어 모드" : "문장 모드";
       feedback("", "");
@@ -302,19 +306,21 @@
       const bad = state.mood==="bad", good=state.mood==="good";
       if (dogImage.complete && dogImage.naturalWidth > 0) {
         // 계단 오르는 느낌: 진행값에 따라 상하 바운스 + 살짝 전방 기울기
-        const phase = state.stair * 0.9 + now * 0.01;
+        const phase = scene.cam * 0.9 + now * 0.01;
         const hop = Math.abs(Math.sin(phase)) * 5;
-        const lean = 0.04 + Math.sin(phase) * 0.02;
+        const lean = -0.05 + Math.sin(phase) * 0.015;
         const w = 126;
         const h = w * (dogImage.naturalHeight / dogImage.naturalWidth);
         ctx.save();
         ctx.translate(x, y - hop);
         ctx.rotate(lean);
+        ctx.scale(-1, 1); // 계단 진행 방향(오른쪽 위)으로 시선 맞춤
         // 접지 그림자(발바닥 위치 기준)
         ctx.fillStyle="rgba(0,0,0,.2)";
-        ctx.beginPath(); ctx.ellipse(4, 30, 30, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-4, 30, 30, 8, 0, 0, Math.PI*2); ctx.fill();
         // 발 위치가 계단 윗면에 닿도록 하단 정렬
-        ctx.drawImage(dogImage, -w / 2, -h + 36, w, h);
+        const footY = 34;
+        ctx.drawImage(dogImage, -w / 2, footY - h, w, h);
         ctx.restore();
         return;
       }
@@ -345,11 +351,12 @@
       ctx.clearRect(0,0,w,h);
       const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,"#bfe0ff"); g.addColorStop(1,"#ffe0f7");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-      const cam = state.stair;
+      scene.cam += (state.stair - scene.cam) * 0.14;
+      const cam = scene.cam;
       for(let i=cam-3;i<cam+12;i++){
         const rel=i-cam, x=130+rel*92, y=h-34-rel*20;
         if(x<-150||x>w+40||y<-40||y>h+20) continue;
-        ctx.fillStyle=i<=cam?"#ffd4ee":"rgba(255,255,255,.85)";
+        ctx.fillStyle=i<=state.stair?"#ffd4ee":"rgba(255,255,255,.85)";
         ctx.fillRect(x,y,160,22);
         ctx.strokeStyle="rgba(180,170,240,.45)";
         ctx.strokeRect(x,y,160,22);
