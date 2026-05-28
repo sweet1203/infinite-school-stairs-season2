@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>영타 계단</title>
+  <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
   <style>
     :root{
       --bg:#f5f8ff; --panel:#ffffff; --line:#d6e2ff; --txt:#3b4262; --sub:#7f8bb2;
@@ -12,7 +13,7 @@
     *{box-sizing:border-box}
     body{
       margin:0; min-height:100vh; color:var(--txt);
-      font-family:"Pretendard","Apple SD Gothic Neo","Segoe UI",sans-serif;
+      font-family:"Jua","Pretendard","Apple SD Gothic Neo","Segoe UI",sans-serif;
       background:linear-gradient(180deg,#e9f3ff 0%,#ffeefe 100%);
     }
     .wrap{width:min(1200px,100vw - 32px); margin:16px auto; min-height:calc(100vh - 32px);}
@@ -25,16 +26,37 @@
 
     /* main */
     #mainScreen{align-items:center; justify-content:center}
-    .main-panel{max-width:760px; margin:auto; padding:32px 24px; text-align:center;}
-    h1{margin:0; font-size:clamp(34px,7vw,62px); letter-spacing:2px}
-    .subtitle{margin-top:8px; color:var(--sub)}
-    .menu{margin-top:28px; display:grid; gap:12px}
-    .menu button{
-      border:1px solid #c7d6ff; border-radius:14px; background:linear-gradient(145deg,#ffd6ef,#d6e6ff);
-      color:#3b4262; font-size:clamp(20px,3vw,28px); font-weight:800; padding:18px 12px; cursor:pointer;
+    .main-panel{
+      max-width:760px; margin:auto; padding:36px 26px; text-align:center;
+      background:linear-gradient(180deg,#1a0533 0%,#0d0d2b 100%);
+      border-color:rgba(255,105,180,.35);
     }
-    .menu button small{display:block; font-size:13px; color:#7581a8; margin-top:4px; font-weight:600}
-    .footer{margin-top:22px; color:#7f8bb2; font-size:14px}
+    @keyframes glow {
+      from { text-shadow:0 0 12px #ff69b4; }
+      to   { text-shadow:0 0 35px #ff69b4, 0 0 70px #ff1493; }
+    }
+    @keyframes bounce {
+      0%,100% { transform:translateY(0); }
+      50%      { transform:translateY(-8px); }
+    }
+    h1{
+      margin:0; font-size:clamp(42px,8vw,72px); letter-spacing:2px; color:#fff; animation:glow 2s ease-in-out infinite alternate;
+    }
+    .subtitle{margin-top:8px; color:rgba(255,255,255,.65); letter-spacing:2px}
+    .menu{margin-top:30px; display:grid; gap:12px; justify-items:center}
+    .menu button{
+      width:min(420px,100%); border:0; border-radius:999px;
+      background:linear-gradient(135deg,#ff69b4,#ff1493);
+      color:#fff; font-size:clamp(22px,3.5vw,30px); font-weight:800; padding:16px 16px; cursor:pointer;
+      box-shadow:0 6px 24px rgba(255,105,180,.5);
+    }
+    .menu button:nth-child(2){ background:linear-gradient(135deg,#8d7bff,#5b63ff); box-shadow:0 6px 24px rgba(120,120,255,.45); }
+    .menu button:nth-child(3){ background:transparent; border:2px solid rgba(255,105,180,.55); color:#ff9ed0; box-shadow:none; }
+    .menu button:hover{ transform:translateY(-1px); }
+    .menu button:active{ transform:scale(.98); }
+    .menu button small{display:block; font-size:13px; color:rgba(255,255,255,.85); margin-top:4px; font-weight:500}
+    .menu button:nth-child(3) small{ color:rgba(255,158,208,.9); }
+    .footer{margin-top:24px; color:rgba(255,255,255,.55); font-size:14px; letter-spacing:1px}
 
     /* game */
     #gameScreen{align-items:stretch}
@@ -131,7 +153,7 @@
       <div class="panel rank-panel">
         <div class="rank-head">
           <div class="rank-title">기록보기</div>
-          <button id="btnRankBack" style="border:0;border-radius:9px;padding:9px 12px;background:#2a3d71;color:#fff;cursor:pointer">메인으로</button>
+          <button id="btnRankBack" style="border:0;border-radius:9px;padding:9px 12px;background:#4b6fce;color:#fff;cursor:pointer">메인으로</button>
         </div>
         <div id="rankList" class="rank-list"></div>
         <div class="rank-actions">
@@ -215,10 +237,37 @@
       moodUntil: 0
     };
     const scene = {
-      cam: 0
+      cam: 0,
+      stepAnimUntil: 0
     };
     const dogImage = new Image();
     dogImage.src = "dog.png"; // 사용자가 만든 강아지 캐릭터 파일
+    const movingDogImage = new Image();
+    movingDogImage.src = "moving_dog.PNG"; // 5단계 동작 스프라이트
+    let movingDogCanvas = null;
+    movingDogImage.onload = () => {
+      // 체크무늬 배경을 투명 처리해 스프라이트처럼 사용
+      const c = document.createElement("canvas");
+      c.width = movingDogImage.naturalWidth;
+      c.height = movingDogImage.naturalHeight;
+      const cx = c.getContext("2d");
+      cx.drawImage(movingDogImage, 0, 0);
+      const img = cx.getImageData(0, 0, c.width, c.height);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        if (r > 220 && g > 220 && b > 220) d[i + 3] = 0;
+      }
+      cx.putImageData(img, 0, 0);
+      movingDogCanvas = c;
+    };
+    const movingFrames = [
+      { sx:   0, sy: 250, sw: 280, sh: 560 },
+      { sx: 260, sy: 250, sw: 300, sh: 560 },
+      { sx: 560, sy: 250, sw: 300, sh: 560 },
+      { sx: 860, sy: 250, sw: 300, sh: 560 },
+      { sx:1160, sy: 250, sw: 300, sh: 560 }
+    ];
 
     let ac = null;
     function getAC(){ if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==="suspended") ac.resume(); return ac; }
@@ -282,6 +331,7 @@
         state.stair += 1;
         state.score += state.target.length;
         react("good"); sfx.good(); feedback(`정답! +${state.target.length}점`, "good");
+        scene.stepAnimUntil = Date.now() + 320;
       }else{
         state.stair = Math.max(0, state.stair - 1);
         react("bad"); sfx.bad(); feedback(`오답: ${typed}`, "bad");
@@ -304,20 +354,37 @@
 
     function drawChar(ctx,x,y,now){
       const bad = state.mood==="bad", good=state.mood==="good";
+      if (movingDogCanvas) {
+        const active = now < scene.stepAnimUntil;
+        const frameIdx = active
+          ? Math.min(4, Math.floor(((scene.stepAnimUntil - now) / 320) * -5 + 5))
+          : 0;
+        const f = movingFrames[Math.max(0, Math.min(4, frameIdx))];
+        const scale = 0.55;
+        const dw = f.sw * scale;
+        const dh = f.sh * scale;
+        const bob = active ? Math.sin(now * 0.03) * 4 : Math.sin(now * 0.01) * 1.5;
+        ctx.save();
+        ctx.translate(x, y - bob);
+        ctx.fillStyle = "rgba(0,0,0,.2)";
+        ctx.beginPath(); ctx.ellipse(0, 28, 28, 8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 36, dw, dh);
+        ctx.restore();
+        return;
+      }
       if (dogImage.complete && dogImage.naturalWidth > 0) {
         // 계단 오르는 느낌: 진행값에 따라 상하 바운스 + 살짝 전방 기울기
         const phase = scene.cam * 0.9 + now * 0.01;
         const hop = Math.abs(Math.sin(phase)) * 5;
-        const lean = -0.05 + Math.sin(phase) * 0.015;
+        const lean = -0.03 + Math.sin(phase) * 0.01;
         const w = 126;
         const h = w * (dogImage.naturalHeight / dogImage.naturalWidth);
         ctx.save();
         ctx.translate(x, y - hop);
         ctx.rotate(lean);
-        ctx.scale(-1, 1); // 계단 진행 방향(오른쪽 위)으로 시선 맞춤
         // 접지 그림자(발바닥 위치 기준)
         ctx.fillStyle="rgba(0,0,0,.2)";
-        ctx.beginPath(); ctx.ellipse(-4, 30, 30, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(4, 30, 30, 8, 0, 0, Math.PI*2); ctx.fill();
         // 발 위치가 계단 윗면에 닿도록 하단 정렬
         const footY = 34;
         ctx.drawImage(dogImage, -w / 2, footY - h, w, h);
