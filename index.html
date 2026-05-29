@@ -97,9 +97,19 @@
     .rank-list{margin-top:14px; border:1px solid var(--line); border-radius:12px; padding:10px; max-height:56vh; overflow:auto}
     .row{display:flex; justify-content:space-between; border-bottom:1px solid rgba(168,182,219,.2); padding:7px 4px}
     .name{max-width:70%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-    .rank-actions{margin-top:12px; display:flex; gap:8px}
-    .rank-actions input{flex:1; border:1px solid #3a4e87; border-radius:10px; background:#0b1329; color:#fff; padding:10px}
-    .rank-actions button{border:0; border-radius:10px; background:#ff99c9; color:#fff; padding:10px 12px; font-weight:800; cursor:pointer}
+    /* 게임오버 모달 — 이름 저장 영역 */
+    .go-save{display:flex; gap:8px; margin-top:10px}
+    .go-save input{
+      flex:1; border:1px solid #c8d7ff; border-radius:10px;
+      background:#fff; color:#44507b; padding:10px 12px;
+      font-size:15px; font-family:inherit; outline:none;
+    }
+    .go-save input:focus{border-color:#95b0ff;}
+    .go-save button{
+      border:0; border-radius:10px; background:#ff99c9;
+      color:#fff; padding:10px 14px; font-weight:800; cursor:pointer; white-space:nowrap;
+    }
+    .go-save button:disabled{opacity:.4; cursor:not-allowed;}
 
     /* gameover modal */
     .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(190,205,255,.45); z-index:20}
@@ -156,23 +166,25 @@
           <button id="btnRankBack" style="border:0;border-radius:9px;padding:9px 12px;background:#4b6fce;color:#fff;cursor:pointer">메인으로</button>
         </div>
         <div id="rankList" class="rank-list"></div>
-        <div class="rank-actions">
-          <input id="playerName" maxlength="8" placeholder="이름 입력">
-          <button id="btnSaveRank">현재 점수 저장</button>
-        </div>
       </div>
     </section>
   </div>
 
   <section id="gameoverModal" class="modal">
     <div class="card">
-      <h2 id="goTitle">TIME OVER!</h2>
+      <h2 id="goTitle">GAME OVER</h2>
       <div id="goMeta" class="meta"></div>
       <div class="card-grid">
         <div class="box"><div class="k">점수</div><div id="goScore" class="v">0</div></div>
         <div class="box"><div class="k">계단</div><div id="goStair" class="v">0</div></div>
       </div>
-      <div style="display:flex; gap:8px; margin-top:12px">
+      <!-- 이름 입력 + 기록 저장 -->
+      <div class="go-save" style="margin-top:14px">
+        <input id="goNameInput" maxlength="8" placeholder="이름 입력 (최대 8자)" autocomplete="off" />
+        <button id="btnGoSave">기록 저장</button>
+      </div>
+      <div id="goSaveMsg" style="font-size:13px;color:#7f8bb2;margin-top:6px;min-height:18px"></div>
+      <div style="display:flex; gap:8px; margin-top:10px">
         <button id="btnGoReplay" style="flex:1;border:0;border-radius:10px;padding:10px;background:#4b6fce;color:#fff;font-weight:800;cursor:pointer">다시 플레이</button>
         <button id="btnGoClose" style="flex:1;border:0;border-radius:10px;padding:10px;background:#2a3d71;color:#fff;font-weight:800;cursor:pointer">메인으로</button>
       </div>
@@ -213,13 +225,14 @@
       feedback: document.getElementById("feedback"),
       stairCanvas: document.getElementById("stairCanvas"),
       rankList: document.getElementById("rankList"),
-      playerName: document.getElementById("playerName"),
-      btnSaveRank: document.getElementById("btnSaveRank"),
       gameover: document.getElementById("gameoverModal"),
       goTitle: document.getElementById("goTitle"),
       goMeta: document.getElementById("goMeta"),
       goScore: document.getElementById("goScore"),
       goStair: document.getElementById("goStair"),
+      goNameInput: document.getElementById("goNameInput"),
+      btnGoSave: document.getElementById("btnGoSave"),
+      goSaveMsg: document.getElementById("goSaveMsg"),
       btnGoReplay: document.getElementById("btnGoReplay"),
       btnGoClose: document.getElementById("btnGoClose")
     };
@@ -237,10 +250,15 @@
       mood: "idle",
       moodUntil: 0
     };
-    const STEP_MS = 260;
+    const STEP_MS = 270;
+    const STEP_X = 92;
+    const STEP_Y = 34;
+    const STAIR_W = 160;
+    const STAIR_H = 22;
+    const STAIR_COUNT = 14;
     const scene = {
       cam: 0,
-      visualStair: 0,
+      visualStep: 0,
       stepFrom: 0,
       stepTo: 0,
       stepStartedAt: 0,
@@ -249,30 +267,35 @@
     const dogImage = new Image();
     dogImage.src = "dog.png"; // 사용자가 만든 강아지 캐릭터 파일
     const movingDogImage = new Image();
-    movingDogImage.src = "moving_dog_clean.png"; // 계단/안내문을 제거한 5단계 동작 스프라이트
+    movingDogImage.src = "dog_jump_sprite.png"; // 강아지만 누끼 딴 점프 스프라이트
     let movingDogCanvas = null;
     movingDogImage.onload = () => {
-      // 체크무늬 배경을 투명 처리해 스프라이트처럼 사용
-      const c = document.createElement("canvas");
-      c.width = movingDogImage.naturalWidth;
-      c.height = movingDogImage.naturalHeight;
-      const cx = c.getContext("2d");
-      cx.drawImage(movingDogImage, 0, 0);
-      const img = cx.getImageData(0, 0, c.width, c.height);
-      const d = img.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], g = d[i + 1], b = d[i + 2];
-        if (r > 220 && g > 220 && b > 220) d[i + 3] = 0;
+      // file:// 환경에서는 getImageData가 막힐 수 있어, 먼저 PNG 자체를 바로 사용한다.
+      movingDogCanvas = movingDogImage;
+      try {
+        const c = document.createElement("canvas");
+        c.width = movingDogImage.naturalWidth;
+        c.height = movingDogImage.naturalHeight;
+        const cx = c.getContext("2d");
+        cx.drawImage(movingDogImage, 0, 0);
+        const img = cx.getImageData(0, 0, c.width, c.height);
+        const d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          if (r > 220 && g > 220 && b > 220) d[i + 3] = 0;
+        }
+        cx.putImageData(img, 0, 0);
+        movingDogCanvas = c;
+      } catch {
+        movingDogCanvas = movingDogImage;
       }
-      cx.putImageData(img, 0, 0);
-      movingDogCanvas = c;
     };
     const movingFrames = [
-      { sx:   0, sy: 250, sw: 280, sh: 560 },
-      { sx: 260, sy: 250, sw: 300, sh: 560 },
-      { sx: 560, sy: 250, sw: 300, sh: 560 },
-      { sx: 860, sy: 250, sw: 300, sh: 560 },
-      { sx:1160, sy: 250, sw: 300, sh: 560 }
+      { sx:  70, sy: 246, sw: 336, sh: 329 },
+      { sx: 481, sy: 274, sw: 352, sh: 299 },
+      { sx: 898, sy: 155, sw: 347, sh: 413 },
+      { sx:1312, sy: 133, sw: 400, sh: 343 },
+      { sx:1752, sy: 266, sw: 338, sh: 308 }
     ];
 
     let ac = null;
@@ -312,12 +335,7 @@
       state.stair = 0;
       state.timeLeft = LIMIT_SEC;
       state.mood = "idle";
-      scene.cam = 0;
-      scene.visualStair = 0;
-      scene.stepFrom = 0;
-      scene.stepTo = 0;
-      scene.stepStartedAt = 0;
-      scene.stepAnimUntil = 0;
+      resetScene();
       clearTimeout(state.timer);
       el.modeLabel.textContent = mode==="word" ? "단어 모드" : "문장 모드";
       feedback("", "");
@@ -337,7 +355,14 @@
       state.timer = setTimeout(tick, 1000);
     }
 
-    function easeInOutSine(t){ return -(Math.cos(Math.PI * t) - 1) / 2; }
+    function resetScene(){
+      scene.cam = 0;
+      scene.visualStep = 0;
+      scene.stepFrom = 0;
+      scene.stepTo = 0;
+      scene.stepStartedAt = 0;
+      scene.stepAnimUntil = 0;
+    }
     function beginStepMotion(from, to){
       const now = Date.now();
       scene.stepFrom = from;
@@ -345,15 +370,18 @@
       scene.stepStartedAt = now;
       scene.stepAnimUntil = now + STEP_MS;
     }
+    function advanceSceneStep(){
+      beginStepMotion(state.stair - 1, state.stair);
+    }
     function getStepMotion(now){
       if (now >= scene.stepAnimUntil) {
-        scene.visualStair = state.stair;
-        return { active:false, t:1, eased:1, visual:state.stair };
+        scene.visualStep = state.stair;
+        return { active:false, t:1, visual:scene.visualStep };
       }
       const t = Math.min(1, Math.max(0, (now - scene.stepStartedAt) / STEP_MS));
-      const eased = easeInOutSine(t);
-      scene.visualStair = scene.stepFrom + (scene.stepTo - scene.stepFrom) * eased;
-      return { active:true, t, eased, visual:scene.visualStair };
+      const eased = -(Math.cos(Math.PI * t) - 1) / 2;
+      scene.visualStep = scene.stepFrom + (scene.stepTo - scene.stepFrom) * eased;
+      return { active:true, t, visual:scene.visualStep };
     }
 
     function handleTypingKey(e){
@@ -378,11 +406,10 @@
       if (!expected) return;
 
       if (key.toLowerCase() === expected.toLowerCase()) {
-        const prevStair = state.stair;
         state.progressIdx += 1;
         state.stair += 1;   // 한 글자 맞출 때마다 +1칸
         state.score += 1;   // 점수도 글자 단위
-        beginStepMotion(prevStair, state.stair);
+        advanceSceneStep();
         react("good");
         sfx.type(key.charCodeAt(0));
         el.wordInput.value = state.target.slice(0, state.progressIdx);
@@ -404,15 +431,23 @@
       }
     }
 
+    const LS_NAME_KEY = "typingS2LastName";
+
     function gameOver(reason){
       state.running = false;
       clearTimeout(state.timer);
       sfx.over();
       el.goTitle.textContent = "GAME OVER";
-      el.goMeta.textContent = `${reason} · 현재 점수 저장 가능`;
+      el.goMeta.textContent = `${reason} · 이름을 입력하고 기록을 저장하세요!`;
       el.goScore.textContent = String(state.score);
       el.goStair.textContent = String(state.stair);
+      // 이전에 입력한 이름 자동 채우기
+      el.goNameInput.value = localStorage.getItem(LS_NAME_KEY) || "";
+      el.goSaveMsg.textContent = "";
+      el.btnGoSave.disabled = false;
+      el.btnGoSave.textContent = "기록 저장";
       el.gameover.classList.add("show");
+      setTimeout(() => el.goNameInput.focus(), 100);
     }
 
     function drawChar(ctx,x,y,now,motion){
@@ -420,15 +455,20 @@
       if (movingDogCanvas) {
         const active = motion && motion.active;
         const t = active ? motion.t : 0;
-        const runningFrames = [1, 2, 3, 3, 4];
-        const frameIdx = active ? runningFrames[Math.min(4, Math.floor(t * 5))] : 0;
+        const runningFrames = [1, 2, 3, 4, 4];
+        const frameIdx = active ? runningFrames[Math.min(runningFrames.length - 1, Math.floor(t * runningFrames.length))] : 0;
         const f = movingFrames[Math.max(0, Math.min(4, frameIdx))];
-        const scale = 0.55;
+        const scale = 0.36;
         const dw = f.sw * scale;
         const dh = f.sh * scale;
-        const lift = active ? Math.sin(t * Math.PI) * 34 : Math.sin(now * 0.01) * 1.5;
-        const lean = active ? -0.12 + t * 0.18 : 0;
-        const shadowScale = active ? 1 - Math.sin(t * Math.PI) * 0.42 : 1;
+        const jump = active ? Math.sin(t * Math.PI) : 0;
+        const lift = active ? jump * 18 : Math.sin(now * 0.01) * 1.5;
+        const dir = 1;
+        const lean = active ? 0.14 - t * 0.12 : 0;
+        const landing = active && t > 0.8 ? (t - 0.8) / 0.2 : 0;
+        const stretchY = active ? 1 + jump * 0.03 - landing * 0.04 : 1;
+        const squashX = active ? 1 - jump * 0.02 + landing * 0.08 : 1;
+        const shadowScale = active ? 1 - jump * 0.28 : 1;
 
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,.2)";
@@ -437,8 +477,9 @@
 
         ctx.save();
         ctx.translate(x, y - lift);
+        ctx.scale(dir * squashX, stretchY);
         ctx.rotate(lean);
-        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 36, dw, dh);
+        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 22, dw, dh);
         ctx.restore();
         return;
       }
@@ -451,6 +492,7 @@
         const h = w * (dogImage.naturalHeight / dogImage.naturalWidth);
         ctx.save();
         ctx.translate(x, y - hop);
+        ctx.scale(-1, 1);
         ctx.rotate(lean);
         // 접지 그림자(발바닥 위치 기준)
         ctx.fillStyle="rgba(0,0,0,.2)";
@@ -489,21 +531,37 @@
       const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,"#bfe0ff"); g.addColorStop(1,"#ffe0f7");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
       const motion = getStepMotion(now);
-      const cameraTarget = motion.active
-        ? scene.stepFrom + (scene.stepTo - scene.stepFrom) * Math.max(0, motion.eased - 0.35) / 0.65
-        : state.stair;
-      scene.cam += (cameraTarget - scene.cam) * (motion.active ? 0.28 : 0.12);
+      const cameraTarget = Math.max(0, motion.visual - 2.1);
+      scene.cam += (cameraTarget - scene.cam) * 0.22;
       const cam = scene.cam;
-      for(let i=cam-3;i<cam+12;i++){
-        const rel=i-cam, x=130+rel*92, y=h-34-rel*20;
-        if(x<-150||x>w+40||y<-40||y>h+20) continue;
-        ctx.fillStyle=i<=state.stair?"#ffd4ee":"rgba(255,255,255,.85)";
-        ctx.fillRect(x,y,160,22);
+      const start = Math.floor(cam) - 3;
+      const end = start + STAIR_COUNT;
+      for (let i=start; i<end; i++){
+        const rel = i - cam;
+        const x = 230 + rel * STEP_X - STAIR_W / 2;
+        const y = h - 46 - rel * STEP_Y;
+        if(x<-STAIR_W||x>w+STAIR_W||y<-40||y>h+40) continue;
+        ctx.fillStyle = "rgba(0,0,0,.18)";
+        ctx.beginPath(); ctx.roundRect(x + 5, y + 6, STAIR_W, STAIR_H, 6); ctx.fill();
+        const completed = i >= 0 && i < state.stair;
+        ctx.fillStyle = completed ? "#ff9ed0" : i === state.stair ? "#ffd4ee" : "rgba(255,255,255,.88)";
+        ctx.beginPath(); ctx.roundRect(x, y, STAIR_W, STAIR_H, 6); ctx.fill();
+        if (completed) {
+          const fill = ctx.createLinearGradient(x, y, x + STAIR_W, y);
+          fill.addColorStop(0, "#ff69b4");
+          fill.addColorStop(1, "#ffb6df");
+          ctx.fillStyle = fill;
+          ctx.beginPath(); ctx.roundRect(x, y, STAIR_W, STAIR_H, 6); ctx.fill();
+        }
+        ctx.fillStyle="rgba(255,255,255,.45)";
+        ctx.fillRect(x+8,y+3,STAIR_W-16,3);
         ctx.strokeStyle="rgba(180,170,240,.45)";
-        ctx.strokeRect(x,y,160,22);
+        ctx.strokeRect(x,y,STAIR_W,STAIR_H);
       }
       const dogRel = motion.visual - cam;
-      drawChar(ctx,260 + dogRel * 92,h-98 - dogRel * 20,now,motion);
+      const dogX = 230 + dogRel * STEP_X;
+      const dogY = h - 82 - dogRel * STEP_Y;
+      drawChar(ctx,dogX,dogY,now,motion);
       requestAnimationFrame(drawScene);
     }
 
@@ -516,28 +574,49 @@
       if(!rows.length){ el.rankList.innerHTML="<div class='row'><span>아직 기록이 없어요.</span></div>"; return; }
       el.rankList.innerHTML = rows.map((r,i)=>`<div class="row"><span class="name">${i+1}. ${esc(r.name)}</span><strong>${Number(r.score)||0}</strong></div>`).join("");
     }
+    function renderRankError(message){
+      const local = localRead();
+      const localHtml = local.length
+        ? local.slice(0,10).map((r,i)=>`<div class="row"><span class="name">${i+1}. ${esc(r.name)} <small>로컬</small></span><strong>${Number(r.score)||0}</strong></div>`).join("")
+        : "<div class='row'><span>이 브라우저에도 임시 기록이 없어요.</span></div>";
+      el.rankList.innerHTML = `<div class="row"><span>${esc(message)}</span></div>${localHtml}`;
+    }
     async function loadRank(){
       try{
         const res=await fetch(`${DB_URL}/${RANK_PATH}.json`), data=await res.json();
+        if(!res.ok || data?.error) throw new Error(data?.error || `HTTP ${res.status}`);
         const rows=(data&&typeof data==="object")?Object.values(data):[];
         rows.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
         const top=rows.slice(0,10); localWrite(top); renderRank(top);
-      }catch{ renderRank(localRead()); }
-    }
-    async function saveRank(){
-      const row = { name:sanitizeName(el.playerName.value), score:state.score, mode:state.mode==="word"?"W":"S", ts:Date.now() };
-      el.playerName.value = row.name;
-      try{
-        const r=await fetch(`${DB_URL}/${RANK_PATH}.json`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(row)});
-        const body = await r.json().catch(() => ({}));
-        if(!r.ok || body.error) throw new Error(body.error || "save failed");
-        await loadRank();
-        alert(`랭킹 저장 완료! (${row.name} · ${row.score}점)`);
       }catch(e){
+        console.warn("Firebase 랭킹 불러오기 실패:", e);
+        renderRankError("Firebase 권한 오류: database.rules.json 배포가 필요해요.");
+      }
+    }
+    async function saveRankFromModal(){
+      const name = sanitizeName(el.goNameInput.value);
+      if (!name) { el.goSaveMsg.textContent = "이름을 입력해주세요!"; return; }
+      const row = { name, score: state.score, stair: state.stair, mode: state.mode==="word"?"W":"S", ts: Date.now() };
+      // 이름 기억
+      localStorage.setItem(LS_NAME_KEY, name);
+      el.btnGoSave.disabled = true;
+      el.btnGoSave.textContent = "저장 중...";
+      try {
+        const r = await fetch(`${DB_URL}/${RANK_PATH}.json`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(row)
+        });
+        const body = await r.json().catch(()=>({}));
+        if (!r.ok || body.error) throw new Error(body.error || "save failed");
+        el.goSaveMsg.textContent = `✅ ${name} · ${state.score}점 저장됐어요!`;
+        el.btnGoSave.textContent = "저장 완료";
+      } catch(e) {
         console.warn("Firebase 저장 실패, 로컬에만 저장:", e);
-        const rows=localRead(); rows.push(row); rows.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)); localWrite(rows);
-        renderRank(rows.slice(0,10));
-        alert("서버 저장은 실패했어요. 이 브라우저에만 임시 저장됐습니다.\n(Firebase Rules 배포가 필요할 수 있어요.)");
+        const rows = localRead(); rows.push(row);
+        rows.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)); localWrite(rows);
+        el.goSaveMsg.textContent = `📱 ${name} · ${state.score}점 (이 기기에 저장됨)`;
+        el.btnGoSave.textContent = "저장 완료";
       }
     }
 
@@ -548,7 +627,11 @@
     el.btnBackMain.addEventListener("click", ()=>{ state.running=false; clearTimeout(state.timer); show("main"); });
     el.btnRestart.addEventListener("click", ()=>start(state.mode));
     el.wordInput.addEventListener("keydown", handleTypingKey);
-    el.btnSaveRank.addEventListener("click", saveRank);
+    // 게임오버 모달 — 기록 저장
+    el.btnGoSave.addEventListener("click", saveRankFromModal);
+    el.goNameInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.isComposing) saveRankFromModal();
+    });
     el.btnGoReplay.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); start(state.mode); });
     el.btnGoClose.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); show("main"); });
 
