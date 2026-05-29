@@ -237,14 +237,19 @@
       mood: "idle",
       moodUntil: 0
     };
+    const STEP_MS = 180;
     const scene = {
       cam: 0,
+      visualStair: 0,
+      stepFrom: 0,
+      stepTo: 0,
+      stepStartedAt: 0,
       stepAnimUntil: 0
     };
     const dogImage = new Image();
     dogImage.src = "dog.png"; // 사용자가 만든 강아지 캐릭터 파일
     const movingDogImage = new Image();
-    movingDogImage.src = "moving_dog.PNG"; // 5단계 동작 스프라이트
+    movingDogImage.src = "moving_dog_clean.png"; // 계단/안내문을 제거한 5단계 동작 스프라이트
     let movingDogCanvas = null;
     movingDogImage.onload = () => {
       // 체크무늬 배경을 투명 처리해 스프라이트처럼 사용
@@ -308,6 +313,11 @@
       state.timeLeft = LIMIT_SEC;
       state.mood = "idle";
       scene.cam = 0;
+      scene.visualStair = 0;
+      scene.stepFrom = 0;
+      scene.stepTo = 0;
+      scene.stepStartedAt = 0;
+      scene.stepAnimUntil = 0;
       clearTimeout(state.timer);
       el.modeLabel.textContent = mode==="word" ? "단어 모드" : "문장 모드";
       feedback("", "");
@@ -325,6 +335,25 @@
       updateHUD();
       if(state.timeLeft <= 0){ gameOver("시간 종료"); return; }
       state.timer = setTimeout(tick, 1000);
+    }
+
+    function easeInOutSine(t){ return -(Math.cos(Math.PI * t) - 1) / 2; }
+    function beginStepMotion(from, to){
+      const now = Date.now();
+      scene.stepFrom = from;
+      scene.stepTo = to;
+      scene.stepStartedAt = now;
+      scene.stepAnimUntil = now + STEP_MS;
+    }
+    function getStepMotion(now){
+      if (now >= scene.stepAnimUntil) {
+        scene.visualStair = state.stair;
+        return { active:false, t:1, eased:1, visual:state.stair };
+      }
+      const t = Math.min(1, Math.max(0, (now - scene.stepStartedAt) / STEP_MS));
+      const eased = easeInOutSine(t);
+      scene.visualStair = scene.stepFrom + (scene.stepTo - scene.stepFrom) * eased;
+      return { active:true, t, eased, visual:scene.visualStair };
     }
 
     function handleTypingKey(e){
@@ -349,10 +378,11 @@
       if (!expected) return;
 
       if (key.toLowerCase() === expected.toLowerCase()) {
+        const prevStair = state.stair;
         state.progressIdx += 1;
         state.stair += 1;   // 한 글자 맞출 때마다 +1칸
         state.score += 1;   // 점수도 글자 단위
-        scene.stepAnimUntil = Date.now() + 220;
+        beginStepMotion(prevStair, state.stair);
         react("good");
         sfx.type(key.charCodeAt(0));
         el.wordInput.value = state.target.slice(0, state.progressIdx);
@@ -385,22 +415,26 @@
       el.gameover.classList.add("show");
     }
 
-    function drawChar(ctx,x,y,now){
+    function drawChar(ctx,x,y,now,motion){
       const bad = state.mood==="bad", good=state.mood==="good";
       if (movingDogCanvas) {
-        const active = now < scene.stepAnimUntil;
+        const active = motion && motion.active;
+        const t = active ? motion.t : 0;
         const frameIdx = active
-          ? Math.min(4, Math.floor(((scene.stepAnimUntil - now) / 320) * -5 + 5))
+          ? Math.min(4, Math.floor(t * 5))
           : 0;
         const f = movingFrames[Math.max(0, Math.min(4, frameIdx))];
         const scale = 0.55;
         const dw = f.sw * scale;
         const dh = f.sh * scale;
-        const bob = active ? Math.sin(now * 0.03) * 4 : Math.sin(now * 0.01) * 1.5;
+        const hop = active ? Math.sin(t * Math.PI) * 28 : Math.sin(now * 0.01) * 1.5;
+        const lean = active ? -0.08 + Math.sin(t * Math.PI) * 0.12 : 0;
+        const shadowScale = active ? 1 - Math.sin(t * Math.PI) * 0.32 : 1;
         ctx.save();
-        ctx.translate(x, y - bob);
+        ctx.translate(x, y - hop);
+        ctx.rotate(lean);
         ctx.fillStyle = "rgba(0,0,0,.2)";
-        ctx.beginPath(); ctx.ellipse(0, 28, 28, 8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(0, 28 + hop * 0.15, 28 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2); ctx.fill();
         ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 36, dw, dh);
         ctx.restore();
         return;
@@ -451,7 +485,8 @@
       ctx.clearRect(0,0,w,h);
       const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,"#bfe0ff"); g.addColorStop(1,"#ffe0f7");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
-      scene.cam += (state.stair - scene.cam) * 0.14;
+      const motion = getStepMotion(now);
+      scene.cam = motion.visual;
       const cam = scene.cam;
       for(let i=cam-3;i<cam+12;i++){
         const rel=i-cam, x=130+rel*92, y=h-34-rel*20;
@@ -461,8 +496,8 @@
         ctx.strokeStyle="rgba(180,170,240,.45)";
         ctx.strokeRect(x,y,160,22);
       }
-      // 캐릭터 기준점을 계단 윗면보다 약간 위로 배치
-      drawChar(ctx,260,h-98,now);
+      const runX = motion.active ? Math.sin(motion.t * Math.PI) * 10 : 0;
+      drawChar(ctx,260+runX,h-98,now,motion);
       requestAnimationFrame(drawScene);
     }
 
@@ -485,13 +520,19 @@
     }
     async function saveRank(){
       const row = { name:sanitizeName(el.playerName.value), score:state.score, mode:state.mode==="word"?"W":"S", ts:Date.now() };
+      el.playerName.value = row.name;
       try{
         const r=await fetch(`${DB_URL}/${RANK_PATH}.json`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(row)});
-        if(!r.ok) throw new Error("save failed");
-      }catch{
+        const body = await r.json().catch(() => ({}));
+        if(!r.ok || body.error) throw new Error(body.error || "save failed");
+        await loadRank();
+        alert(`랭킹 저장 완료! (${row.name} · ${row.score}점)`);
+      }catch(e){
+        console.warn("Firebase 저장 실패, 로컬에만 저장:", e);
         const rows=localRead(); rows.push(row); rows.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)); localWrite(rows);
+        renderRank(rows.slice(0,10));
+        alert("서버 저장은 실패했어요. 이 브라우저에만 임시 저장됐습니다.\n(Firebase Rules 배포가 필요할 수 있어요.)");
       }
-      loadRank();
     }
 
     el.btnWord.addEventListener("click", ()=>start("word"));
