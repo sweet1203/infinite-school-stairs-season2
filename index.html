@@ -237,7 +237,7 @@
       mood: "idle",
       moodUntil: 0
     };
-    const STEP_MS = 180;
+    const STEP_MS = 260;
     const scene = {
       cam: 0,
       visualStair: 0,
@@ -420,21 +420,24 @@
       if (movingDogCanvas) {
         const active = motion && motion.active;
         const t = active ? motion.t : 0;
-        const frameIdx = active
-          ? Math.min(4, Math.floor(t * 5))
-          : 0;
+        const runningFrames = [1, 2, 3, 3, 4];
+        const frameIdx = active ? runningFrames[Math.min(4, Math.floor(t * 5))] : 0;
         const f = movingFrames[Math.max(0, Math.min(4, frameIdx))];
         const scale = 0.55;
         const dw = f.sw * scale;
         const dh = f.sh * scale;
-        const hop = active ? Math.sin(t * Math.PI) * 28 : Math.sin(now * 0.01) * 1.5;
-        const lean = active ? -0.08 + Math.sin(t * Math.PI) * 0.12 : 0;
-        const shadowScale = active ? 1 - Math.sin(t * Math.PI) * 0.32 : 1;
+        const lift = active ? Math.sin(t * Math.PI) * 34 : Math.sin(now * 0.01) * 1.5;
+        const lean = active ? -0.12 + t * 0.18 : 0;
+        const shadowScale = active ? 1 - Math.sin(t * Math.PI) * 0.42 : 1;
+
         ctx.save();
-        ctx.translate(x, y - hop);
-        ctx.rotate(lean);
         ctx.fillStyle = "rgba(0,0,0,.2)";
-        ctx.beginPath(); ctx.ellipse(0, 28 + hop * 0.15, 28 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + 4, y + 28, 30 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(x, y - lift);
+        ctx.rotate(lean);
         ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 36, dw, dh);
         ctx.restore();
         return;
@@ -486,7 +489,10 @@
       const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,"#bfe0ff"); g.addColorStop(1,"#ffe0f7");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
       const motion = getStepMotion(now);
-      scene.cam = motion.visual;
+      const cameraTarget = motion.active
+        ? scene.stepFrom + (scene.stepTo - scene.stepFrom) * Math.max(0, motion.eased - 0.35) / 0.65
+        : state.stair;
+      scene.cam += (cameraTarget - scene.cam) * (motion.active ? 0.28 : 0.12);
       const cam = scene.cam;
       for(let i=cam-3;i<cam+12;i++){
         const rel=i-cam, x=130+rel*92, y=h-34-rel*20;
@@ -496,8 +502,8 @@
         ctx.strokeStyle="rgba(180,170,240,.45)";
         ctx.strokeRect(x,y,160,22);
       }
-      const runX = motion.active ? Math.sin(motion.t * Math.PI) * 10 : 0;
-      drawChar(ctx,260+runX,h-98,now,motion);
+      const dogRel = motion.visual - cam;
+      drawChar(ctx,260 + dogRel * 92,h-98 - dogRel * 20,now,motion);
       requestAnimationFrame(drawScene);
     }
 
