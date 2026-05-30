@@ -244,8 +244,18 @@
 
   <script src="voca_words.js"></script>
   <script>
-    const DB_URL = "https://school-stair-default-rtdb.asia-southeast1.firebasedatabase.app";
+    const firebaseConfig = {
+      apiKey: "AIzaSyD52DVm_e0dGjEU4wplaInPDp2-oMA-DGA",
+      authDomain: "english-stairs.firebaseapp.com",
+      databaseURL: "https://english-stairs-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "english-stairs",
+      storageBucket: "english-stairs.firebasestorage.app",
+      messagingSenderId: "468902922942",
+      appId: "1:468902922942:web:508ad271bc7b9b2f10acef",
+      measurementId: "G-KC7N5R108E"
+    };
     const RANK_PATH = "rankingsSeason2";
+    const FIREBASE_DB_URL_KEY = "englishStairsFirebaseDbUrl";
     const LS_RANK_KEY = "typingS2LocalRank";
     const LIMIT_SEC = 200;
 
@@ -674,6 +684,36 @@
     function sanitizeName(raw){ const s=String(raw).trim().slice(0,8).replace(/[<>&"'`]/g,""); return s||"익명"; }
     function localRead(){ try{return JSON.parse(localStorage.getItem(LS_RANK_KEY)||"[]")}catch{return []} }
     function localWrite(rows){ localStorage.setItem(LS_RANK_KEY, JSON.stringify(rows.slice(0,10))); }
+    function firebaseDbUrlCandidates(){
+      const saved = localStorage.getItem(FIREBASE_DB_URL_KEY);
+      const urls = [
+        saved,
+        firebaseConfig.databaseURL,
+        `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`
+      ];
+      return urls.filter((url, idx, arr) => url && arr.indexOf(url) === idx);
+    }
+    async function firebaseRequest(path, options){
+      let lastError;
+      for (const url of firebaseDbUrlCandidates()) {
+        try {
+          const res = await fetch(`${url}/${path}.json`, options);
+          const data = await res.json().catch(() => null);
+          if (res.status === 404) {
+            lastError = new Error("Firebase database URL not found");
+            continue;
+          }
+          if (!res.ok || data?.error) throw new Error(data?.error || `HTTP ${res.status}`);
+          localStorage.setItem(FIREBASE_DB_URL_KEY, url);
+          return data;
+        } catch (error) {
+          lastError = error;
+          if (/Permission denied/i.test(error.message)) break;
+        }
+      }
+      localStorage.removeItem(FIREBASE_DB_URL_KEY);
+      throw lastError || new Error("Firebase database unavailable");
+    }
 
     function renderRank(rows){
       if(!rows.length){ el.rankList.innerHTML="<div class='row'><span>아직 기록이 없어요.</span></div>"; return; }
@@ -688,14 +728,13 @@
     }
     async function loadRank(){
       try{
-        const res=await fetch(`${DB_URL}/${RANK_PATH}.json`), data=await res.json();
-        if(!res.ok || data?.error) throw new Error(data?.error || `HTTP ${res.status}`);
-        const rows=(data&&typeof data==="object")?Object.values(data):[];
+        const data = await firebaseRequest(RANK_PATH);
+        const rows = data && typeof data === "object" ? Object.values(data) : [];
         rows.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
         const top=rows.slice(0,10); localWrite(top); renderRank(top);
       }catch(e){
         console.warn("Firebase 랭킹 불러오기 실패:", e);
-        renderRankError("Firebase 권한 오류: database.rules.json 배포가 필요해요.");
+        renderRankError("Firebase 연결/권한 오류: Realtime Database 설정과 rules 배포를 확인해주세요.");
       }
     }
     async function saveRankFromModal(){
@@ -707,13 +746,11 @@
       el.btnGoSave.disabled = true;
       el.btnGoSave.textContent = "저장 중...";
       try {
-        const r = await fetch(`${DB_URL}/${RANK_PATH}.json`, {
+        await firebaseRequest(RANK_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(row)
         });
-        const body = await r.json().catch(()=>({}));
-        if (!r.ok || body.error) throw new Error(body.error || "save failed");
         el.goSaveMsg.textContent = `✅ ${name} · ${state.score}점 저장됐어요!`;
         el.btnGoSave.textContent = "저장 완료";
       } catch(e) {
