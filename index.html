@@ -737,7 +737,7 @@
       }
       const dogRel = motion.visual - cam;
       const dogX = baseX + dogRel * stepX;
-      const dogY = h - 82 * sizeScale - dogRel * stepY;
+      const dogY = h - 70 * sizeScale - dogRel * stepY;
       drawChar(ctx,dogX,dogY,now,motion);
       requestAnimationFrame(drawScene);
     }
