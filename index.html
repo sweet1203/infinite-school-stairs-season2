@@ -678,27 +678,62 @@
       const stairW = STAIR_W * sizeScale;
       const stairH = STAIR_H * Math.max(0.85, sizeScale);
       const baseX = w < 520 ? Math.max(128, w * 0.36) : Math.min(230, w * 0.24);
+      const riserH = Math.max(6, stepY - stairH + 4);  // 앞면 높이
+
       for (let i=start; i<end; i++){
         const rel = i - cam;
         const x = baseX + rel * stepX - stairW / 2;
         const y = h - 46 - rel * stepY;
-        if(x<-stairW||x>w+stairW||y<-40||y>h+40) continue;
-        ctx.fillStyle = "rgba(0,0,0,.18)";
-        ctx.beginPath(); ctx.roundRect(x + 5 * sizeScale, y + 6 * sizeScale, stairW, stairH, 6); ctx.fill();
+        if(x<-stairW||x>w+stairW||y<-60||y>h+60) continue;
         const completed = i >= 0 && i < state.stair;
-        ctx.fillStyle = completed ? "#ff9ed0" : i === state.stair ? "#ffd4ee" : "rgba(255,255,255,.88)";
-        ctx.beginPath(); ctx.roundRect(x, y, stairW, stairH, 6); ctx.fill();
+        const isCurrent = i === state.stair;
+
+        // ── 그림자 ──
+        ctx.fillStyle = "rgba(0,0,0,.13)";
+        ctx.beginPath();
+        ctx.roundRect(x + 4*sizeScale, y + stairH + riserH - 2, stairW, 7*sizeScale, 4);
+        ctx.fill();
+
+        // ── 앞면(riser) — 3D 효과의 핵심 ──
         if (completed) {
-          const fill = ctx.createLinearGradient(x, y, x + stairW, y);
-          fill.addColorStop(0, "#ff69b4");
-          fill.addColorStop(1, "#ffb6df");
-          ctx.fillStyle = fill;
-          ctx.beginPath(); ctx.roundRect(x, y, stairW, stairH, 6); ctx.fill();
+          const rf = ctx.createLinearGradient(x, y+stairH, x+stairW, y+stairH);
+          rf.addColorStop(0, "#c0306a");
+          rf.addColorStop(1, "#e0609a");
+          ctx.fillStyle = rf;
+        } else if (isCurrent) {
+          ctx.fillStyle = "#e8a8cc";
+        } else {
+          ctx.fillStyle = "rgba(195,205,235,.85)";
         }
-        ctx.fillStyle="rgba(255,255,255,.45)";
-        ctx.fillRect(x+8*sizeScale,y+3*sizeScale,stairW-16*sizeScale,3*sizeScale);
-        ctx.strokeStyle="rgba(180,170,240,.45)";
-        ctx.strokeRect(x,y,stairW,stairH);
+        ctx.beginPath();
+        ctx.roundRect(x, y + stairH, stairW, riserH, [0, 0, 5, 5]);
+        ctx.fill();
+
+        // ── 윗면(tread) ──
+        if (completed) {
+          const tf = ctx.createLinearGradient(x, y, x+stairW, y);
+          tf.addColorStop(0, "#ff69b4");
+          tf.addColorStop(1, "#ffb0d8");
+          ctx.fillStyle = tf;
+        } else if (isCurrent) {
+          ctx.fillStyle = "#ffdcf0";
+        } else {
+          ctx.fillStyle = "rgba(255,255,255,.93)";
+        }
+        ctx.beginPath();
+        ctx.roundRect(x, y, stairW, stairH, [6, 6, 3, 3]);
+        ctx.fill();
+
+        // ── 윗면 하이라이트 ──
+        ctx.fillStyle = "rgba(255,255,255,.5)";
+        ctx.fillRect(x + 10*sizeScale, y + 3*sizeScale, stairW - 20*sizeScale, 3*sizeScale);
+
+        // ── 테두리 ──
+        ctx.strokeStyle = completed ? "rgba(220,100,170,.4)" : "rgba(180,170,240,.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, stairW, stairH, [6, 6, 3, 3]);
+        ctx.stroke();
       }
       const dogRel = motion.visual - cam;
       const dogX = baseX + dogRel * stepX;
