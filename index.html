@@ -9,6 +9,7 @@
     :root{
       --bg:#f5f8ff; --panel:#ffffff; --line:#d6e2ff; --txt:#3b4262; --sub:#7f8bb2;
       --good:#31c48d; --bad:#ff7d91; --acc:#7f9bff;
+      --app-height:100dvh;
     }
     *{box-sizing:border-box}
     body{
@@ -16,8 +17,8 @@
       font-family:"Jua","Pretendard","Apple SD Gothic Neo","Segoe UI",sans-serif;
       background:linear-gradient(180deg,#e9f3ff 0%,#ffeefe 100%);
     }
-    .wrap{width:min(1200px,100vw - 32px); margin:16px auto; min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px);}
-    .screen{display:none; min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px);}
+    .wrap{width:min(1200px,100vw - 32px); margin:16px auto; min-height:calc(var(--app-height) - 32px);}
+    .screen{display:none; min-height:calc(var(--app-height) - 32px);}
     .screen.show{display:flex}
     .panel{
       width:100%; border:1px solid var(--line); border-radius:16px; background:rgba(17,26,49,.92);
@@ -62,7 +63,7 @@
     #gameScreen{align-items:stretch}
     .game-panel{
       display:flex; flex-direction:column; padding:clamp(10px,1.7vw,16px); gap:clamp(7px,1.4dvh,12px);
-      min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px); overflow:hidden;
+      min-height:calc(var(--app-height) - 32px); overflow:hidden;
     }
     .top{
       display:flex; justify-content:space-between; align-items:center; gap:8px; color:#6f7ea8;
@@ -129,12 +130,13 @@
     .box .v{font-size:20px; font-weight:900}
 
     @media (max-width: 700px){
-      .wrap{width:100vw; margin:0; min-height:100vh; min-height:100dvh;}
-      .screen{min-height:100vh; min-height:100dvh;}
+      body.typing-active{overflow:hidden}
+      .wrap{width:100vw; margin:0; min-height:var(--app-height);}
+      .screen{min-height:var(--app-height);}
       .panel{border-radius:0}
       #mainScreen{padding:12px}
       .main-panel{border-radius:18px; padding:28px 18px}
-      .game-panel{height:100vh; height:100dvh; min-height:100vh; min-height:100dvh; padding:10px; gap:8px}
+      .game-panel{height:var(--app-height); min-height:var(--app-height); padding:10px; gap:8px}
       .top{align-items:flex-start; flex-wrap:wrap; line-height:1.1}
       .top > div:last-child{flex-wrap:wrap; justify-content:flex-end; gap:5px !important}
       .badge{padding:4px 9px; font-size:12px}
@@ -143,6 +145,14 @@
       .input{font-size:clamp(19px,6vw,27px); padding:9px 11px; border-radius:12px}
       .feedback{min-height:18px; font-size:13px}
       .controls{gap:8px}
+      body.typing-active .game-panel{padding:6px 8px; gap:5px}
+      body.typing-active .top{font-size:12px}
+      body.typing-active .badge{padding:3px 7px; font-size:11px}
+      body.typing-active .scene{flex:1 1 auto; min-height:0}
+      body.typing-active .word{font-size:clamp(21px,6.6vw,30px); line-height:1; min-height:1em}
+      body.typing-active .input{font-size:20px; padding:6px 10px; min-height:39px}
+      body.typing-active .feedback,
+      body.typing-active .controls{display:none}
     }
 
     @media (max-height: 680px){
@@ -182,7 +192,7 @@
         </div>
         <div class="scene"><canvas id="stairCanvas" width="1100" height="320"></canvas></div>
         <div id="targetWord" class="word">start</div>
-        <input id="wordInput" class="input" placeholder="여기에 타이핑 후 Enter" autocomplete="off" spellcheck="false">
+        <input id="wordInput" class="input" placeholder="타이핑 후 Enter" autocomplete="off" autocapitalize="none" autocorrect="off" inputmode="latin" spellcheck="false">
         <div id="feedback" class="feedback"></div>
         <div class="controls">
           <button id="btnBackMain">메인으로</button>
@@ -302,35 +312,17 @@
     movingDogImage.src = "dog_jump_sprite_8.png"; // 강아지만 누끼 딴 8프레임 점프 스프라이트
     let movingDogCanvas = null;
     movingDogImage.onload = () => {
-      // file:// 환경에서는 getImageData가 막힐 수 있어, 먼저 PNG 자체를 바로 사용한다.
       movingDogCanvas = movingDogImage;
-      try {
-        const c = document.createElement("canvas");
-        c.width = movingDogImage.naturalWidth;
-        c.height = movingDogImage.naturalHeight;
-        const cx = c.getContext("2d");
-        cx.drawImage(movingDogImage, 0, 0);
-        const img = cx.getImageData(0, 0, c.width, c.height);
-        const d = img.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const r = d[i], g = d[i + 1], b = d[i + 2];
-          if (r > 220 && g > 220 && b > 220) d[i + 3] = 0;
-        }
-        cx.putImageData(img, 0, 0);
-        movingDogCanvas = c;
-      } catch {
-        movingDogCanvas = movingDogImage;
-      }
     };
     const movingFrames = [
-      { sx:  21, sy:295, sw:235, sh:231 },
-      { sx: 294, sy:301, sw:238, sh:223 },
-      { sx: 564, sy:248, sw:244, sh:277 },
-      { sx: 819, sy:197, sw:262, sh:303 },
-      { sx:1095, sy:198, sw:273, sh:261 },
-      { sx:1348, sy:269, sw:271, sh:250 },
-      { sx:1644, sy:329, sw:236, sh:197 },
-      { sx:1908, sy:295, sw:233, sh:231 }
+      { sx:   0, sy:0, sw:300, sh:320 },
+      { sx: 300, sy:0, sw:300, sh:320 },
+      { sx: 600, sy:0, sw:300, sh:320 },
+      { sx: 900, sy:0, sw:300, sh:320 },
+      { sx:1200, sy:0, sw:300, sh:320 },
+      { sx:1500, sy:0, sw:300, sh:320 },
+      { sx:1800, sy:0, sw:300, sh:320 },
+      { sx:2100, sy:0, sw:300, sh:320 }
     ];
 
     let ac = null;
@@ -349,6 +341,7 @@
       if(screen==="main") el.main.classList.add("show");
       if(screen==="game") el.game.classList.add("show");
       if(screen==="rank") el.rank.classList.add("show");
+      syncMobileViewport();
     }
 
     function pick(){ return state.mode==="word" ? WORDS[Math.floor(Math.random()*WORDS.length)] : SENTENCES[Math.floor(Math.random()*SENTENCES.length)]; }
@@ -362,6 +355,16 @@
     }
     function react(m){ state.mood=m; state.moodUntil=Date.now()+420; }
     function feedback(msg, kind){ el.feedback.textContent=msg; el.feedback.className=`feedback ${kind||""}`; }
+    function syncMobileViewport(){
+      const vv = window.visualViewport;
+      const h = vv ? vv.height : window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${Math.max(360, Math.round(h))}px`);
+      const compactTyping = state.screen === "game"
+        && document.activeElement === el.wordInput
+        && window.matchMedia("(max-width: 700px)").matches;
+      document.body.classList.toggle("typing-active", compactTyping);
+      if (compactTyping) window.scrollTo(0, 0);
+    }
 
     function start(mode){
       state.mode = mode;
@@ -378,6 +381,8 @@
       updateHUD();
       nextTarget();
       el.wordInput.focus();
+      syncMobileViewport();
+      setTimeout(syncMobileViewport, 120);
       getAC();
       tick();
     }
@@ -687,6 +692,13 @@
     el.btnBackMain.addEventListener("click", ()=>{ state.running=false; clearTimeout(state.timer); show("main"); });
     el.btnRestart.addEventListener("click", ()=>start(state.mode));
     el.wordInput.addEventListener("keydown", handleTypingKey);
+    el.wordInput.addEventListener("focus", ()=>{ syncMobileViewport(); setTimeout(syncMobileViewport, 120); });
+    el.wordInput.addEventListener("blur", syncMobileViewport);
+    window.addEventListener("resize", syncMobileViewport);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", syncMobileViewport);
+      window.visualViewport.addEventListener("scroll", syncMobileViewport);
+    }
     // 게임오버 모달 — 기록 저장
     el.btnGoSave.addEventListener("click", saveRankFromModal);
     el.goNameInput.addEventListener("keydown", e => {
@@ -695,6 +707,7 @@
     el.btnGoReplay.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); start(state.mode); });
     el.btnGoClose.addEventListener("click", ()=>{ el.gameover.classList.remove("show"); show("main"); });
 
+    syncMobileViewport();
     drawScene();
     loadRank();
   </script>
