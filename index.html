@@ -91,6 +91,10 @@
       text-align:center; font-size:clamp(28px,5.2vw,64px); line-height:1.05; font-weight:900; letter-spacing:1px; min-height:1.08em; color:#495889;
       word-break:break-word;
     }
+    .meaning{
+      text-align:center; font-size:clamp(13px,2vw,18px); color:#8a95c0;
+      min-height:1.3em; letter-spacing:0.3px; margin-top:-2px;
+    }
     .input{
       width:100%; border:1px solid #c8d7ff; border-radius:14px; background:#fff; color:#44507b;
       font-size:clamp(20px,3.6vw,38px); padding:clamp(8px,1.5dvh,12px) 14px; font-family:"Consolas","Menlo",monospace; outline:none;
@@ -195,12 +199,14 @@
           <div id="modeLabel">단어 모드</div>
           <div style="display:flex; gap:8px; align-items:center">
             <div id="stairLabel" class="badge">계단 0칸</div>
+            <div id="wordCountLabel" class="badge">단어 0개</div>
             <div id="scoreLabel" class="badge">점수 0</div>
             <div id="timeLabel" class="badge">시간 03:20</div>
           </div>
         </div>
         <div class="scene"><canvas id="stairCanvas" width="1100" height="320"></canvas></div>
         <div id="targetWord" class="word">start</div>
+        <div id="wordMeaning" class="meaning"></div>
         <input id="wordInput" class="input" placeholder="타이핑 후 Enter" autocomplete="off" autocapitalize="none" autocorrect="off" inputmode="latin" spellcheck="false">
         <div id="feedback" class="feedback"></div>
         <div class="controls">
@@ -228,6 +234,7 @@
       <div class="card-grid">
         <div class="box"><div class="k">점수</div><div id="goScore" class="v">0</div></div>
         <div class="box"><div class="k">계단</div><div id="goStair" class="v">0</div></div>
+        <div class="box"><div class="k">단어</div><div id="goWords" class="v">0개</div></div>
       </div>
       <!-- 이름 입력 + 기록 저장 -->
       <div class="go-save" style="margin-top:14px">
@@ -243,6 +250,7 @@
   </section>
 
   <script src="voca_words.js"></script>
+  <script src="voca_meanings.js"></script>
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyD52DVm_e0dGjEU4wplaInPDp2-oMA-DGA",
@@ -294,6 +302,9 @@
       goMeta: document.getElementById("goMeta"),
       goScore: document.getElementById("goScore"),
       goStair: document.getElementById("goStair"),
+      goWords: document.getElementById("goWords"),
+      wordCountLabel: document.getElementById("wordCountLabel"),
+      wordMeaning: document.getElementById("wordMeaning"),
       goNameInput: document.getElementById("goNameInput"),
       btnGoSave: document.getElementById("btnGoSave"),
       goSaveMsg: document.getElementById("goSaveMsg"),
@@ -307,6 +318,7 @@
       running: false,
       score: 0,
       stair: 0,
+      words: 0,
       target: "",
       progressIdx: 0,
       timer: null,
@@ -396,12 +408,23 @@
       return next;
     }
     function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
-    function updateHUD(){ el.scoreLabel.textContent=`점수 ${state.score}`; el.stairLabel.textContent=`계단 ${state.stair}칸`; el.timeLabel.textContent=`시간 ${fmt(state.timeLeft)}`; }
+    function updateHUD(){
+      el.scoreLabel.textContent=`점수 ${state.score}`;
+      el.stairLabel.textContent=`계단 ${state.stair}칸`;
+      el.timeLabel.textContent=`시간 ${fmt(state.timeLeft)}`;
+      el.wordCountLabel.textContent=`단어 ${state.words}개`;
+    }
+    function showMeaning(word){
+      const meanings = window.VOCA_MEANINGS || {};
+      const m = meanings[word.toLowerCase()];
+      el.wordMeaning.textContent = m || "";
+    }
     function nextTarget(){
       state.target = pick();
       state.progressIdx = 0;
       el.targetWord.textContent = state.target;
       el.wordInput.value = "";
+      showMeaning(state.target);
     }
     function react(m){ state.mood=m; state.moodUntil=Date.now()+420; }
     function feedback(msg, kind){ el.feedback.textContent=msg; el.feedback.className=`feedback ${kind||""}`; }
@@ -421,6 +444,7 @@
       state.running = true;
       state.score = 0;
       state.stair = 0;
+      state.words = 0;
       state.timeLeft = LIMIT_SEC;
       state.mood = "idle";
       resetScene();
@@ -506,6 +530,8 @@
         updateHUD();
 
         if (state.progressIdx >= state.target.length) {
+          state.words += 1;
+          updateHUD();
           sfx.good();
           feedback("단어 완료! 다음 문제로 넘어갑니다.", "good");
           setTimeout(() => {
@@ -531,6 +557,7 @@
       el.goMeta.textContent = `${reason} · 이름을 입력하고 기록을 저장하세요!`;
       el.goScore.textContent = String(state.score);
       el.goStair.textContent = String(state.stair);
+      el.goWords.textContent = `${state.words}개`;
       // 이전에 입력한 이름 자동 채우기
       el.goNameInput.value = localStorage.getItem(LS_NAME_KEY) || "";
       el.goSaveMsg.textContent = "";
@@ -717,7 +744,14 @@
 
     function renderRank(rows){
       if(!rows.length){ el.rankList.innerHTML="<div class='row'><span>아직 기록이 없어요.</span></div>"; return; }
-      el.rankList.innerHTML = rows.map((r,i)=>`<div class="row"><span class="name">${i+1}. ${esc(r.name)}</span><strong>${Number(r.score)||0}</strong></div>`).join("");
+      el.rankList.innerHTML = rows.map((r,i)=>`
+        <div class="row">
+          <span class="name">${i+1}. ${esc(r.name)} <small style="color:#aab">${r.mode==="W"?"단어":"문장"}</small></span>
+          <span style="display:flex;gap:12px;align-items:center">
+            ${r.words ? `<small style="color:#8a95c0">${Number(r.words)}단어</small>` : ''}
+            <strong>${Number(r.score)||0}점</strong>
+          </span>
+        </div>`).join("");
     }
     function renderRankError(message){
       const local = localRead();
@@ -740,7 +774,7 @@
     async function saveRankFromModal(){
       const name = sanitizeName(el.goNameInput.value);
       if (!name) { el.goSaveMsg.textContent = "이름을 입력해주세요!"; return; }
-      const row = { name, score: state.score, stair: state.stair, mode: state.mode==="word"?"W":"S", ts: Date.now() };
+      const row = { name, score: state.score, stair: state.stair, words: state.words, mode: state.mode==="word"?"W":"S", ts: Date.now() };
       // 이름 기억
       localStorage.setItem(LS_NAME_KEY, name);
       el.btnGoSave.disabled = true;
