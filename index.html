@@ -633,16 +633,19 @@
         const squashX = active ? 1 - jump * 0.02 + landing * 0.08 : 1;
         const shadowScale = active ? 1 - jump * 0.28 : 1;
 
+        // 스프라이트 하단 13px 투명 여백 → 화면에서 약 6.5px 부양 → +7 보정
+        const footOffset = 24 + Math.round(13 * scale);
+
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,.2)";
-        ctx.beginPath(); ctx.ellipse(x + 4, y + 28, 30 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + 4, y + footOffset, 30 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
 
         ctx.save();
         ctx.translate(x, y - lift);
         ctx.scale(dir * squashX, stretchY);
         ctx.rotate(lean);
-        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 24, dw, dh);
+        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + footOffset, dw, dh);
         ctx.restore();
         return;
       }
