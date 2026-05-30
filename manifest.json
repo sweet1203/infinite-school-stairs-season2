@@ -1,20 +1,15 @@
 {
-  "name": "대성여고 무한 학교계단",
-  "short_name": "학교계단",
-  "description": "귀여운 여고쌤과 함께하는 무한 계단 오르기 게임!",
-  "start_url": "./",
+  "name": "영타 계단",
+  "short_name": "영타계단",
+  "description": "강아지와 함께 영어 단어를 타이핑하며 계단을 오르는 게임",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#ff69b4",
-  "background_color": "#0a0010",
+  "theme_color": "#ff99c9",
+  "background_color": "#e9f3ff",
   "lang": "ko",
   "icons": [
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
     {
       "src": "icon-192.png",
       "sizes": "192x192",
