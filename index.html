@@ -185,8 +185,8 @@
         <h1>영타 계단</h1>
         <div class="subtitle">영어 타자 연습 + 계단 올라가기</div>
         <div class="menu">
-          <button id="btnWord">1. 단어 모드 <small>200초 타임어택</small></button>
-          <button id="btnSentence">2. 문장 모드 <small>200초 타임어택</small></button>
+          <button id="btnWord">1. 단어 모드 <small>100초 타임어택</small></button>
+          <button id="btnSentence">2. 문장 모드 <small>100초 타임어택</small></button>
           <button id="btnRank">3. 기록보기 <small>시즌2 TOP 10</small></button>
         </div>
         <div class="footer">대성여고 정보쌤 제작</div>
@@ -265,7 +265,7 @@
     const RANK_PATH = "rankingsSeason2";
     const FIREBASE_DB_URL_KEY = "englishStairsFirebaseDbUrl";
     const LS_RANK_KEY = "typingS2LocalRank";
-    const LIMIT_SEC = 200;
+    const LIMIT_SEC = 100;
 
     const WORDS = Array.isArray(window.VOCA_WORDS) && window.VOCA_WORDS.length
       ? window.VOCA_WORDS
@@ -407,7 +407,7 @@
       }
       return next;
     }
-    function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
+    function fmt(sec){ return `${sec}초`; }
     function updateHUD(){
       el.scoreLabel.textContent=`점수 ${state.score}`;
       el.stairLabel.textContent=`계단 ${state.stair}칸`;
