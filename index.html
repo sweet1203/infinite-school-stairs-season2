@@ -12,12 +12,12 @@
     }
     *{box-sizing:border-box}
     body{
-      margin:0; min-height:100vh; color:var(--txt);
+      margin:0; min-height:100vh; min-height:100dvh; color:var(--txt);
       font-family:"Jua","Pretendard","Apple SD Gothic Neo","Segoe UI",sans-serif;
       background:linear-gradient(180deg,#e9f3ff 0%,#ffeefe 100%);
     }
-    .wrap{width:min(1200px,100vw - 32px); margin:16px auto; min-height:calc(100vh - 32px);}
-    .screen{display:none; min-height:calc(100vh - 32px);}
+    .wrap{width:min(1200px,100vw - 32px); margin:16px auto; min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px);}
+    .screen{display:none; min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px);}
     .screen.show{display:flex}
     .panel{
       width:100%; border:1px solid var(--line); border-radius:16px; background:rgba(17,26,49,.92);
@@ -60,7 +60,10 @@
 
     /* game */
     #gameScreen{align-items:stretch}
-    .game-panel{display:flex; flex-direction:column; padding:16px; gap:12px}
+    .game-panel{
+      display:flex; flex-direction:column; padding:clamp(10px,1.7vw,16px); gap:clamp(7px,1.4dvh,12px);
+      min-height:calc(100vh - 32px); min-height:calc(100dvh - 32px); overflow:hidden;
+    }
     .top{
       display:flex; justify-content:space-between; align-items:center; gap:8px; color:#6f7ea8;
       font-size:clamp(14px,2.2vw,18px); font-weight:700;
@@ -69,22 +72,25 @@
       border:1px solid #c8d7ff; border-radius:999px; background:linear-gradient(145deg,#ffffff,#eef4ff);
       padding:5px 12px; font-size:clamp(12px,2vw,15px); white-space:nowrap; color:#4b5a87;
     }
-    .scene{border:1px solid #c8d8ff; border-radius:12px; overflow:hidden; background:#dcecff}
-    #stairCanvas{display:block; width:100%; height:clamp(220px,40vh,380px)}
+    .scene{
+      flex:1 1 auto; min-height:clamp(240px,46dvh,430px);
+      border:1px solid #c8d8ff; border-radius:12px; overflow:hidden; background:#dcecff;
+    }
+    #stairCanvas{display:block; width:100%; height:100%}
     .word{
-      text-align:center; font-size:clamp(34px,6vw,72px); font-weight:900; letter-spacing:1px; min-height:1.2em; color:#495889;
+      text-align:center; font-size:clamp(28px,5.2vw,64px); line-height:1.05; font-weight:900; letter-spacing:1px; min-height:1.08em; color:#495889;
       word-break:break-word;
     }
     .input{
       width:100%; border:1px solid #c8d7ff; border-radius:14px; background:#fff; color:#44507b;
-      font-size:clamp(24px,4.2vw,44px); padding:12px 16px; font-family:"Consolas","Menlo",monospace; outline:none;
+      font-size:clamp(20px,3.6vw,38px); padding:clamp(8px,1.5dvh,12px) 14px; font-family:"Consolas","Menlo",monospace; outline:none;
     }
     .input:focus{border-color:#95b0ff; box-shadow:0 0 0 2px rgba(149,176,255,.24)}
     .feedback{min-height:1.4em; font-weight:800; font-size:clamp(14px,2vw,18px)}
     .feedback.good{color:var(--good)} .feedback.bad{color:var(--bad)}
     .controls{display:flex; justify-content:space-between; gap:10px}
     .controls button{
-      flex:1; border:0; border-radius:10px; padding:11px; cursor:pointer; font-size:15px; font-weight:800;
+      flex:1; border:0; border-radius:10px; padding:clamp(8px,1.4dvh,11px); cursor:pointer; font-size:clamp(13px,1.7vw,15px); font-weight:800;
       background:#e5edff; color:#51608f;
     }
     .controls button.primary{background:#ff99c9; color:#fff}
@@ -121,6 +127,32 @@
     .box{border:1px solid #d8e2ff; border-radius:10px; padding:8px 10px; background:#fff}
     .box .k{color:var(--sub); font-size:12px}
     .box .v{font-size:20px; font-weight:900}
+
+    @media (max-width: 700px){
+      .wrap{width:100vw; margin:0; min-height:100vh; min-height:100dvh;}
+      .screen{min-height:100vh; min-height:100dvh;}
+      .panel{border-radius:0}
+      #mainScreen{padding:12px}
+      .main-panel{border-radius:18px; padding:28px 18px}
+      .game-panel{height:100vh; height:100dvh; min-height:100vh; min-height:100dvh; padding:10px; gap:8px}
+      .top{align-items:flex-start; flex-wrap:wrap; line-height:1.1}
+      .top > div:last-child{flex-wrap:wrap; justify-content:flex-end; gap:5px !important}
+      .badge{padding:4px 9px; font-size:12px}
+      .scene{min-height:clamp(250px,48dvh,430px)}
+      .word{font-size:clamp(24px,8vw,40px); min-height:1em}
+      .input{font-size:clamp(19px,6vw,27px); padding:9px 11px; border-radius:12px}
+      .feedback{min-height:18px; font-size:13px}
+      .controls{gap:8px}
+    }
+
+    @media (max-height: 680px){
+      .game-panel{padding:8px; gap:6px}
+      .scene{min-height:42dvh}
+      .word{font-size:clamp(22px,5.2dvh,32px)}
+      .input{font-size:clamp(18px,4.8dvh,24px); padding:7px 10px}
+      .feedback{min-height:16px; font-size:12px}
+      .controls button{padding:7px; font-size:13px}
+    }
   </style>
 </head>
 <body>
@@ -267,7 +299,7 @@
     const dogImage = new Image();
     dogImage.src = "dog.png"; // 사용자가 만든 강아지 캐릭터 파일
     const movingDogImage = new Image();
-    movingDogImage.src = "dog_jump_sprite.png"; // 강아지만 누끼 딴 점프 스프라이트
+    movingDogImage.src = "dog_jump_sprite_8.png"; // 강아지만 누끼 딴 8프레임 점프 스프라이트
     let movingDogCanvas = null;
     movingDogImage.onload = () => {
       // file:// 환경에서는 getImageData가 막힐 수 있어, 먼저 PNG 자체를 바로 사용한다.
@@ -291,11 +323,14 @@
       }
     };
     const movingFrames = [
-      { sx:  70, sy: 246, sw: 336, sh: 329 },
-      { sx: 481, sy: 274, sw: 352, sh: 299 },
-      { sx: 898, sy: 155, sw: 347, sh: 413 },
-      { sx:1312, sy: 133, sw: 400, sh: 343 },
-      { sx:1752, sy: 266, sw: 338, sh: 308 }
+      { sx:  21, sy:295, sw:235, sh:231 },
+      { sx: 294, sy:301, sw:238, sh:223 },
+      { sx: 564, sy:248, sw:244, sh:277 },
+      { sx: 819, sy:197, sw:262, sh:303 },
+      { sx:1095, sy:198, sw:273, sh:261 },
+      { sx:1348, sy:269, sw:271, sh:250 },
+      { sx:1644, sy:329, sw:236, sh:197 },
+      { sx:1908, sy:295, sw:233, sh:231 }
     ];
 
     let ac = null;
@@ -455,14 +490,14 @@
       if (movingDogCanvas) {
         const active = motion && motion.active;
         const t = active ? motion.t : 0;
-        const runningFrames = [1, 2, 3, 4, 4];
-        const frameIdx = active ? runningFrames[Math.min(runningFrames.length - 1, Math.floor(t * runningFrames.length))] : 0;
-        const f = movingFrames[Math.max(0, Math.min(4, frameIdx))];
-        const scale = 0.36;
+        const frameIdx = active ? Math.min(movingFrames.length - 1, Math.floor(t * movingFrames.length)) : 0;
+        const f = movingFrames[frameIdx];
+        const viewW = ctx.canvas.getBoundingClientRect().width || ctx.canvas.width;
+        const scale = Math.max(0.46, Math.min(0.54, viewW / 760));
         const dw = f.sw * scale;
         const dh = f.sh * scale;
         const jump = active ? Math.sin(t * Math.PI) : 0;
-        const lift = active ? jump * 18 : Math.sin(now * 0.01) * 1.5;
+        const lift = active ? jump * 16 : Math.sin(now * 0.01) * 1.5;
         const dir = 1;
         const lean = active ? 0.14 - t * 0.12 : 0;
         const landing = active && t > 0.8 ? (t - 0.8) / 0.2 : 0;
@@ -479,7 +514,7 @@
         ctx.translate(x, y - lift);
         ctx.scale(dir * squashX, stretchY);
         ctx.rotate(lean);
-        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 22, dw, dh);
+        ctx.drawImage(movingDogCanvas, f.sx, f.sy, f.sw, f.sh, -dw / 2, -dh + 24, dw, dh);
         ctx.restore();
         return;
       }
@@ -524,43 +559,68 @@
       ctx.restore();
     }
 
+    function fitCanvasToDisplay(){
+      const c = el.stairCanvas;
+      const rect = c.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cssW = Math.max(1, Math.round(rect.width || c.clientWidth || 1100));
+      const cssH = Math.max(1, Math.round(rect.height || c.clientHeight || 320));
+      const nextW = Math.round(cssW * dpr);
+      const nextH = Math.round(cssH * dpr);
+      if (c.width !== nextW || c.height !== nextH) {
+        c.width = nextW;
+        c.height = nextH;
+      }
+      const ctx = c.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w:cssW, h:cssH };
+    }
+
     function drawScene(){
-      const c = el.stairCanvas, ctx = c.getContext("2d"), w=c.width, h=c.height, now=Date.now();
+      const { ctx, w, h } = fitCanvasToDisplay();
+      const now=Date.now();
       if(state.moodUntil < now) state.mood="idle";
       ctx.clearRect(0,0,w,h);
       const g = ctx.createLinearGradient(0,0,0,h); g.addColorStop(0,"#bfe0ff"); g.addColorStop(1,"#ffe0f7");
       ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
       const motion = getStepMotion(now);
-      const cameraTarget = Math.max(0, motion.visual - 2.1);
+      const leadSteps = w < 520 ? 1.25 : 2.1;
+      const cameraTarget = Math.max(0, motion.visual - leadSteps);
       scene.cam += (cameraTarget - scene.cam) * 0.22;
       const cam = scene.cam;
       const start = Math.floor(cam) - 3;
       const end = start + STAIR_COUNT;
+      const sizeScale = Math.max(0.72, Math.min(1, w / 760));
+      const stepX = STEP_X * sizeScale;
+      const stepY = STEP_Y * sizeScale;
+      const stairW = STAIR_W * sizeScale;
+      const stairH = STAIR_H * Math.max(0.85, sizeScale);
+      const baseX = w < 520 ? Math.max(128, w * 0.36) : Math.min(230, w * 0.24);
       for (let i=start; i<end; i++){
         const rel = i - cam;
-        const x = 230 + rel * STEP_X - STAIR_W / 2;
-        const y = h - 46 - rel * STEP_Y;
-        if(x<-STAIR_W||x>w+STAIR_W||y<-40||y>h+40) continue;
+        const x = baseX + rel * stepX - stairW / 2;
+        const y = h - 46 - rel * stepY;
+        if(x<-stairW||x>w+stairW||y<-40||y>h+40) continue;
         ctx.fillStyle = "rgba(0,0,0,.18)";
-        ctx.beginPath(); ctx.roundRect(x + 5, y + 6, STAIR_W, STAIR_H, 6); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(x + 5 * sizeScale, y + 6 * sizeScale, stairW, stairH, 6); ctx.fill();
         const completed = i >= 0 && i < state.stair;
         ctx.fillStyle = completed ? "#ff9ed0" : i === state.stair ? "#ffd4ee" : "rgba(255,255,255,.88)";
-        ctx.beginPath(); ctx.roundRect(x, y, STAIR_W, STAIR_H, 6); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(x, y, stairW, stairH, 6); ctx.fill();
         if (completed) {
-          const fill = ctx.createLinearGradient(x, y, x + STAIR_W, y);
+          const fill = ctx.createLinearGradient(x, y, x + stairW, y);
           fill.addColorStop(0, "#ff69b4");
           fill.addColorStop(1, "#ffb6df");
           ctx.fillStyle = fill;
-          ctx.beginPath(); ctx.roundRect(x, y, STAIR_W, STAIR_H, 6); ctx.fill();
+          ctx.beginPath(); ctx.roundRect(x, y, stairW, stairH, 6); ctx.fill();
         }
         ctx.fillStyle="rgba(255,255,255,.45)";
-        ctx.fillRect(x+8,y+3,STAIR_W-16,3);
+        ctx.fillRect(x+8*sizeScale,y+3*sizeScale,stairW-16*sizeScale,3*sizeScale);
         ctx.strokeStyle="rgba(180,170,240,.45)";
-        ctx.strokeRect(x,y,STAIR_W,STAIR_H);
+        ctx.strokeRect(x,y,stairW,stairH);
       }
       const dogRel = motion.visual - cam;
-      const dogX = 230 + dogRel * STEP_X;
-      const dogY = h - 82 - dogRel * STEP_Y;
+      const dogX = baseX + dogRel * stepX;
+      const dogY = h - 82 * sizeScale - dogRel * stepY;
       drawChar(ctx,dogX,dogY,now,motion);
       requestAnimationFrame(drawScene);
     }
