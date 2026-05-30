@@ -1,11 +1,6 @@
 {
   "rules": {
-    "rankingsSeason2": {
-      ".read": true,
-      "$id": {
-        ".write": "!data.exists() && newData.exists()",
-        ".validate": "newData.hasChildren(['name', 'score', 'mode', 'ts']) && newData.child('name').isString() && newData.child('name').val().matches(/^.{1,8}$/) && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 999999 && newData.child('mode').isString() && (newData.child('mode').val() === 'W' || newData.child('mode').val() === 'S' || newData.child('mode').val() === 'A' || newData.child('mode').val() === 'B') && newData.child('ts').isNumber() && newData.child('ts').val() > 0"
-      }
-    }
+    ".read": true,
+    ".write": true
   }
 }
