@@ -233,13 +233,16 @@
     </div>
   </section>
 
+  <script src="voca_words.js"></script>
   <script>
     const DB_URL = "https://school-stair-default-rtdb.asia-southeast1.firebasedatabase.app";
     const RANK_PATH = "rankingsSeason2";
     const LS_RANK_KEY = "typingS2LocalRank";
     const LIMIT_SEC = 200;
 
-    const WORDS = ["accordance","community","confidence","sustainable","workshop","phenomenon","architecture","leadership","evaluation","discipline","awareness","strategy","efficient","consequence","organization","recognition","investigation","template","clarity","original"];
+    const WORDS = Array.isArray(window.VOCA_WORDS) && window.VOCA_WORDS.length
+      ? window.VOCA_WORDS
+      : ["accordance","community","confidence","sustainable","workshop","phenomenon","architecture","leadership","evaluation","discipline","awareness","strategy","efficient","consequence","organization","recognition","investigation","template","clarity","original"];
     const SENTENCES = [
       "practice builds confidence",
       "small habits create big change",
@@ -292,6 +295,7 @@
       mood: "idle",
       moodUntil: 0
     };
+    const targetBags = { word: [], sentence: [] };
     const STEP_MS = 270;
     const STEP_X = 92;
     const STEP_Y = 34;
@@ -344,7 +348,34 @@
       syncMobileViewport();
     }
 
-    function pick(){ return state.mode==="word" ? WORDS[Math.floor(Math.random()*WORDS.length)] : SENTENCES[Math.floor(Math.random()*SENTENCES.length)]; }
+    function shuffle(list){
+      const bag = list.slice();
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+      return bag;
+    }
+    function refillTargetBag(mode){
+      const source = mode === "word" ? WORDS : SENTENCES;
+      const bag = shuffle(source);
+      if (bag.length > 1 && bag[bag.length - 1] === state.target) {
+        const swapIdx = bag.findIndex(item => item !== state.target);
+        [bag[bag.length - 1], bag[swapIdx]] = [bag[swapIdx], bag[bag.length - 1]];
+      }
+      targetBags[mode] = bag;
+    }
+    function pick(){
+      const mode = state.mode === "word" ? "word" : "sentence";
+      if (!targetBags[mode].length) refillTargetBag(mode);
+      let next = targetBags[mode].pop();
+      if (next === state.target && targetBags[mode].length) {
+        const alt = targetBags[mode].pop();
+        targetBags[mode].push(next);
+        next = alt;
+      }
+      return next;
+    }
     function fmt(sec){ const m=Math.floor(sec/60), s=sec%60; return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`; }
     function updateHUD(){ el.scoreLabel.textContent=`점수 ${state.score}`; el.stairLabel.textContent=`계단 ${state.stair}칸`; el.timeLabel.textContent=`시간 ${fmt(state.timeLeft)}`; }
     function nextTarget(){
