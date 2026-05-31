@@ -633,8 +633,8 @@
         const squashX = active ? 1 - jump * 0.02 + landing * 0.08 : 1;
         const shadowScale = active ? 1 - jump * 0.28 : 1;
 
-        // 스프라이트 하단 13px 투명 여백 → 화면에서 약 6.5px 부양 → +7 보정
-        const footOffset = 24 + Math.round(13 * scale);
+        // 스프라이트 하단 13px 투명 여백 제거 → 실제 발 위치 보정
+        const footOffset = Math.round(24 + 13 * scale);
 
         ctx.save();
         ctx.fillStyle = "rgba(0,0,0,.2)";
@@ -786,7 +786,10 @@
       }
       const dogRel = motion.visual - cam;
       const dogX = baseX + dogRel * stepX;
-      const dogY = h - 70 * sizeScale - dogRel * stepY;
+      // 계단 tread top = h - 46 (고정값). 강아지 발 = tread top이 되도록 역산
+      // footOffset ≈ 31 (scale=0.5 기준), dogY = h - 46 - footOffset = h - 77
+      const dogFootOffset = Math.round(24 + 13 * Math.max(0.46, Math.min(0.54, w / 760)));
+      const dogY = h - 46 - dogFootOffset - dogRel * stepY;
       drawChar(ctx,dogX,dogY,now,motion);
       requestAnimationFrame(drawScene);
     }
