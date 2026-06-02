@@ -575,8 +575,7 @@
 
         if (state.mode === "sentence") {
           state.score += 2;   // 문장 모드: 글자당 2점
-          // 공백(단어 구분) 또는 문장 마지막 글자 → 단어 완성 → 계단 1칸
-          if (expected === ' ' || state.progressIdx >= state.target.length) {
+          if (expected !== ' ') {   // 공백 제외, 글자당 계단 1칸
             state.stair += 1;
             advanceSceneStep();
           }
