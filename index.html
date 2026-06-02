@@ -847,11 +847,20 @@
       throw lastError || new Error("Firebase database unavailable");
     }
 
+    function fmtTs(ts){
+      if(!ts) return "";
+      const d = new Date(ts);
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mi = String(d.getMinutes()).padStart(2,"0");
+      return `${mm}/${dd} ${hh}:${mi}`;
+    }
     function renderRank(rows){
       if(!rows.length){ el.rankList.innerHTML="<div class='row'><span>아직 기록이 없어요.</span></div>"; return; }
       el.rankList.innerHTML = rows.map((r,i)=>`
         <div class="row">
-          <span class="name">${i+1}. ${esc(r.name)} <small style="color:#aab">${r.mode==="W"?"단어":"문장"}</small></span>
+          <span class="name">${i+1}. ${esc(r.name)} <small style="color:#aab">${r.mode==="W"?"단어":"문장"}</small>${r.ts ? `<small style="color:#7a8aaa;margin-left:6px">${fmtTs(r.ts)}</small>` : ''}</span>
           <span style="display:flex;gap:12px;align-items:center">
             ${r.words ? `<small style="color:#8a95c0">${Number(r.words)}${r.mode === "S" ? "문장" : "단어"}</small>` : ''}
             <strong>${Number(r.score)||0}점</strong>
