@@ -1,6 +1,15 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "rankingsSeason2": {
+      ".read": true,
+      ".write": true,
+      "$record": {
+        ".validate": "newData.hasChildren(['name', 'score', 'ts']) && newData.child('name').isString() && newData.child('name').val().length >= 1 && newData.child('name').val().length <= 20 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('ts').isNumber()"
+      }
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
   }
 }
